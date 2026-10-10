@@ -106,7 +106,7 @@ flutter run -d iPhone
 ## ⚡ Tooling & Environment Next Steps
 
 1. **Flutter CLI**: Added to `~/.zshrc` (`export PATH="$HOME/flutter/bin:$PATH"`).
-2. **JDK & Android SDK**: Install **JDK 21 (LTS)** and **Android Studio** for the Android SDK, command-line tools, and AVD. The Gradle config uses Java 21 (`sourceCompatibility = JavaVersion.VERSION_21`, `jvmTarget = JVM_21`).
+2. **JDK & Android SDK (CLI-only)**: Install **JDK 21 (LTS)** and **Android Command-Line Tools** via Homebrew (`brew install openjdk@21 && brew install --cask android-commandlinetools`). Use the modern `android sdk` CLI (`android sdk install "platforms;android-36" ...`) to manage packages.
 3. **iOS Toolchain**: Install Xcode from the Mac App Store, then run:
    ```bash
    sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer
