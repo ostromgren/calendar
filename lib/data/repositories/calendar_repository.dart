@@ -42,7 +42,7 @@ class CalendarRepository {
       ),
       CalendarEvent(
         id: '2',
-        title: 'Design Review: Android 14 & iOS 18 UI',
+        title: 'Design Review: Android 16 & iOS 27 UI',
         description: 'Verify Material 3 & Cupertino adaptive patterns.',
         startTime: today.add(const Duration(hours: 14)),
         endTime: today.add(const Duration(hours: 15, minutes: 30)),

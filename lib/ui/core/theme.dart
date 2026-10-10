@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 /// App theme configuration using modern Material 3.
-/// Works cleanly on both Android 14/15 and iOS 17/18.
+/// Works cleanly on both Android 15/16 and iOS 26/27.
 class AppTheme {
   static const _seedColor = Color(0xFF2563EB); // Modern Royal Blue
 

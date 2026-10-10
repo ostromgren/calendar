@@ -6,10 +6,10 @@ A cross-platform Calendar application for Android and iOS built with Flutter and
 
 ## 📱 Platform Targets
 
-| Platform | Latest 2 Versions Supported | Minimum Supported | Configuration File |
+| Platform | Latest 2 Versions Supported | Targeted Version | Configuration File |
 | :--- | :--- | :--- | :--- |
-| **Android** | **Android 14** (API 34) & **Android 15** (API 35) | Android 5.0 (API 21+) | `android/app/build.gradle.kts` |
-| **iOS** | **iOS 17** & **iOS 18** | iOS 15.0+ | `ios/Runner.xcodeproj` / `ios/Podfile` |
+| **Android** | **Android 15** (API 35) & **Android 16** (API 36) | **Android 16** (API 36) | `android/app/build.gradle.kts` |
+| **iOS** | **iOS 26** & **iOS 27** (2026 versioning) | **iOS 27** (Deployment target 26.0+) | `ios/Runner.xcodeproj` / `ios/Podfile` |
 
 ---
 
