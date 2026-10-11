@@ -7,14 +7,13 @@ import 'widgets/month_header.dart';
 
 /// The main calendar screen.
 ///
-/// Android Comparison:
-/// - In Android, this would be an `Activity` / `Fragment` observing a `ViewModel`
-///   via Jetpack Compose's `collectAsStateWithLifecycle()` or LiveData.
-/// - In Flutter, we use `ListenableBuilder` to automatically listen and rebuild
-///   only when `viewModel.notifyListeners()` fires.
-/// - We use `CustomScrollView` with Slivers (Flutter's equivalent to Android's
-///   `CoordinatorLayout` / `NestedScrollView`), ensuring smooth scrolling and
-///   zero layout overflows across phone sizes and orientations.
+/// Renders a full monthly grid with selectable day cells and a scrollable
+/// daily event list below. Uses [CustomScrollView] with [SliverGrid] and
+/// [SliverList] so the entire page scrolls as one unified surface, avoiding
+/// layout overflows across different device sizes and orientations.
+///
+/// Listens to [CalendarViewModel] via [ListenableBuilder] and rebuilds only
+/// when [CalendarViewModel.notifyListeners] is called.
 class CalendarView extends StatefulWidget {
   const CalendarView({super.key, required this.viewModel});
 

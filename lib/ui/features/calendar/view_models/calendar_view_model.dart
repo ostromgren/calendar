@@ -2,14 +2,13 @@ import 'package:flutter/foundation.dart';
 import 'package:calendar/data/repositories/calendar_repository.dart';
 import 'package:calendar/domain/models/calendar_event.dart';
 
-/// ViewModel managing state for the calendar view.
+/// ViewModel for the calendar screen.
 ///
-/// Android Comparison:
-/// - In Android with Jetpack Compose, you write `class CalendarViewModel : ViewModel()`.
-/// - In Flutter, `ChangeNotifier` is the built-in foundation for state notification.
-/// - In Android, you update `MutableStateFlow.value = ...`.
-/// - In Flutter, you update local fields and call `notifyListeners()`, which informs
-///   any listening `ListenableBuilder` or UI component to re-render.
+/// Holds the currently selected date, the focused month shown in the grid,
+/// and delegates all event persistence to [CalendarRepository].
+///
+/// Call [notifyListeners] after any mutation so that [ListenableBuilder]
+/// widgets rebuild automatically with the latest state.
 class CalendarViewModel extends ChangeNotifier {
   CalendarViewModel({required this.repository}) {
     final now = DateTime.now();

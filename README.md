@@ -13,33 +13,30 @@ A cross-platform Calendar application for Android and iOS built with Flutter and
 
 ---
 
-## 🧠 Android Developer's Bridge to Flutter & iOS
+## 🧱 Key Concepts
 
-Coming from 3 years of Android development (targeting Android 14), here is how your existing knowledge maps to Flutter and iOS:
+### State Management
+The app uses Flutter's built-in [`ChangeNotifier`](lib/ui/features/calendar/view_models/calendar_view_model.dart) pattern:
+- **ViewModel** holds and mutates state, calling `notifyListeners()` after each change.
+- **View** wraps its build in `ListenableBuilder(listenable: viewModel, ...)` and rebuilds automatically.
 
-### 1. Architectural Concepts
+### Layered Architecture
+| Layer | Responsibility |
+| :--- | :--- |
+| `domain/models/` | Immutable data classes with no framework dependencies |
+| `data/repositories/` | Single source of truth for reading and writing events |
+| `ui/features/*/view_models/` | UI state, user intent handlers, delegates to repository |
+| `ui/features/*/views/` | Stateless widgets that render ViewModel state |
+| `ui/core/` | Shared theme, colours, and typography |
 
-| Android (Kotlin / Jetpack) | Flutter Equivalent | iOS Native Equivalent |
+### Native Platform Configuration
+| Concern | Android | iOS |
 | :--- | :--- | :--- |
-| `Activity` / `Fragment` | `Widget` (e.g. `Scaffold`, `CalendarView`) | `UIViewController` |
-| `@Composable` function | `StatelessWidget` / `StatefulWidget` | SwiftUI `@View` |
-| `ViewModel` + `StateFlow` | `ChangeNotifier` + `ListenableBuilder` | `ObservableObject` / `@Observable` |
-| `MutableStateFlow.value = ...` | `notifyListeners()` | `@Published` / `@Observable` |
-| `data class Event(...)` | `class CalendarEvent` with `const` constructor & `final` fields | Swift `struct Event` |
-| `Modifier.fillMaxSize().padding()` | `Container`, `Padding`, `Expanded`, `SizedBox` | Swift modifiers |
-| `RecyclerView` / `LazyColumn` | `ListView.builder` / `SliverList` | `List` / `UICollectionView` |
-| `CoordinatorLayout` / NestedScroll | `CustomScrollView` + Slivers | `UIScrollView` |
-
-### 2. Project File Structure Mapping
-
-| Android | iOS | Purpose |
-| :--- | :--- | :--- |
-| `android/app/build.gradle.kts` | `ios/Podfile` & `Runner.xcodeproj` | Build config, min/target SDK, plugins |
-| `android/app/src/main/AndroidManifest.xml` | `ios/Runner/Info.plist` | App name, permissions, orientation, metadata |
-| `MainActivity.kt` | `AppDelegate.swift` & `SceneDelegate.swift` | Native app entry point and platform channels |
-| `applicationId = "com.example.calendar"` | `PRODUCT_BUNDLE_IDENTIFIER` | Unique app identifier |
-| `res/values/strings.xml`, `themes.xml` | `lib/ui/core/theme.dart` | Material 3 themes & styling (shared across both!) |
-| `res/drawable`, `res/mipmap` | `ios/Runner/Assets.xcassets` | App icons and native splash assets |
+| Build config | `android/app/build.gradle.kts` | `ios/Runner.xcodeproj` / `ios/Podfile` |
+| App metadata & permissions | `android/app/src/main/AndroidManifest.xml` | `ios/Runner/Info.plist` |
+| Native entry point | `android/.../MainActivity.kt` | `ios/Runner/AppDelegate.swift` |
+| App bundle identifier | `applicationId` in `build.gradle.kts` | `PRODUCT_BUNDLE_IDENTIFIER` in Xcode |
+| Icons & splash assets | `android/app/src/main/res/mipmap-*/` | `ios/Runner/Assets.xcassets` |
 
 ---
 

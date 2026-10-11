@@ -6,15 +6,14 @@ import 'ui/features/calendar/views/calendar_view.dart';
 
 /// Entry point of the Flutter application.
 ///
-/// Android Comparison:
-/// - In Android, the OS enters through `Application.onCreate()` and launches the default `Activity`.
-/// - In Flutter, execution starts in Dart's top-level `void main()`.
-/// - `runApp(...)` inflates the widget tree and attaches it to the screen surface.
+/// [WidgetsFlutterBinding.ensureInitialized] must be called before any
+/// native or asynchronous initialization. [runApp] inflates the widget
+/// tree and attaches it to the screen surface.
 void main() {
-  // Ensure Flutter engine bindings are initialized before calling native or async code
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Instantiate dependencies (In larger apps, use get_it or Provider for dependency injection)
+  // Instantiate dependencies manually here.
+  // In larger apps, consider a dependency injection package such as get_it or riverpod.
   final calendarRepository = CalendarRepository();
   final calendarViewModel = CalendarViewModel(repository: calendarRepository);
 
@@ -23,12 +22,9 @@ void main() {
 
 /// Root widget of the application.
 ///
-/// Android Comparison:
-/// - `StatelessWidget`: Similar to a pure Jetpack Compose `@Composable` function
-///   without internal `remember { mutableStateOf(...) }`. It is immutable and re-renders
-///   whenever its parent passes new inputs.
-/// - `MaterialApp`: Sets up routing, localization, navigation, and theme
-///   (analogous to the root Theme / NavHost setup in modern Android Compose).
+/// [CalendarApp] is a [StatelessWidget] because it holds no mutable state of
+/// its own — it simply configures [MaterialApp] with the app's theme and
+/// navigation root, passing the pre-built [viewModel] down the tree.
 class CalendarApp extends StatelessWidget {
   const CalendarApp({super.key, required this.viewModel});
 
@@ -41,7 +37,7 @@ class CalendarApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
-      themeMode: ThemeMode.system, // Automatically adapts to system dark/light mode
+      themeMode: ThemeMode.system, // Follows the device's light/dark preference.
       home: CalendarView(viewModel: viewModel),
     );
   }
