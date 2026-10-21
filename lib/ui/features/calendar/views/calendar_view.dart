@@ -24,24 +24,18 @@ class CalendarView extends StatefulWidget {
   const CalendarView({
     super.key,
     required this.viewModel,
-    this.themeViewModel,
+    required this.themeViewModel,
   });
 
   final CalendarViewModel viewModel;
-  final ThemeViewModel? themeViewModel;
+  final ThemeViewModel themeViewModel;
 
   @override
   State<CalendarView> createState() => _CalendarViewState();
 }
 
 class _CalendarViewState extends State<CalendarView> {
-  late final ThemeViewModel _themeViewModel;
-
-  @override
-  void initState() {
-    super.initState();
-    _themeViewModel = widget.themeViewModel ?? ThemeViewModel();
-  }
+  ThemeViewModel get _themeViewModel => widget.themeViewModel;
 
   /// Generates the ordered 7 weekday labels starting from [firstDay].
   List<String> _buildWeekdayLabels(StartingDayOfWeek firstDay) {

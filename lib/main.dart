@@ -1,6 +1,7 @@
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter/material.dart';
 import 'data/repositories/calendar_repository.dart';
+import 'data/repositories/settings_repository.dart';
 import 'ui/core/theme.dart';
 import 'ui/features/calendar/view_models/calendar_view_model.dart';
 import 'ui/features/calendar/views/calendar_view.dart';
@@ -11,14 +12,23 @@ import 'ui/features/settings/view_models/theme_view_model.dart';
 /// [WidgetsFlutterBinding.ensureInitialized] must be called before any
 /// native or asynchronous initialization. [runApp] inflates the widget
 /// tree and attaches it to the screen surface.
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Load persisted settings before constructing view models so that the UI
+  // starts with the user's last-chosen preferences immediately.
+  final settingsRepository = await SettingsRepository.load();
 
   // Instantiate dependencies manually here.
   // In larger apps, consider a dependency injection package such as get_it or riverpod.
   final calendarRepository = CalendarRepository();
-  final calendarViewModel = CalendarViewModel(repository: calendarRepository);
-  final themeViewModel = ThemeViewModel();
+  final calendarViewModel = CalendarViewModel(
+    repository: calendarRepository,
+    settingsRepository: settingsRepository,
+  );
+  final themeViewModel = ThemeViewModel(
+    settingsRepository: settingsRepository,
+  );
 
   runApp(CalendarApp(
     viewModel: calendarViewModel,
@@ -30,36 +40,18 @@ void main() {
 ///
 /// Wraps [MaterialApp] in [DynamicColorBuilder] so Android 12+ wallpaper and
 /// palette colors are made available to [AppTheme.createTheme].
-class CalendarApp extends StatefulWidget {
+class CalendarApp extends StatelessWidget {
   const CalendarApp({
     super.key,
     required this.viewModel,
-    this.themeViewModel,
+    required this.themeViewModel,
   });
 
   final CalendarViewModel viewModel;
-  final ThemeViewModel? themeViewModel;
-
-  @override
-  State<CalendarApp> createState() => _CalendarAppState();
-}
-
-class _CalendarAppState extends State<CalendarApp> {
-  ThemeViewModel? _fallbackThemeViewModel;
-
-  ThemeViewModel get _effectiveThemeViewModel =>
-      widget.themeViewModel ?? (_fallbackThemeViewModel ??= ThemeViewModel());
-
-  @override
-  void dispose() {
-    _fallbackThemeViewModel?.dispose();
-    super.dispose();
-  }
+  final ThemeViewModel themeViewModel;
 
   @override
   Widget build(BuildContext context) {
-    final themeViewModel = _effectiveThemeViewModel;
-
     return DynamicColorBuilder(
       builder: (lightDynamic, darkDynamic) {
         return ListenableBuilder(
@@ -83,7 +75,7 @@ class _CalendarAppState extends State<CalendarApp> {
               darkTheme: darkTheme,
               themeMode: themeViewModel.themeMode,
               home: CalendarView(
-                viewModel: widget.viewModel,
+                viewModel: viewModel,
                 themeViewModel: themeViewModel,
               ),
             );

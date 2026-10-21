@@ -1,17 +1,31 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:calendar/data/repositories/calendar_repository.dart';
+import 'package:calendar/data/repositories/settings_repository.dart';
 import 'package:calendar/main.dart';
 import 'package:calendar/ui/features/calendar/view_models/calendar_view_model.dart';
+import 'package:calendar/ui/features/settings/view_models/theme_view_model.dart';
 
 void main() {
-  testWidgets('Calendar app renders header, grid, and event button', (tester) async {
-    final repository = CalendarRepository();
-    final viewModel = CalendarViewModel(repository: repository);
+  Future<(CalendarViewModel, ThemeViewModel)> buildViewModels() async {
+    SharedPreferences.setMockInitialValues({});
+    final settings = await SettingsRepository.load();
+    final viewModel = CalendarViewModel(
+      repository: CalendarRepository(),
+      settingsRepository: settings,
+    );
+    final themeViewModel = ThemeViewModel(settingsRepository: settings);
+    return (viewModel, themeViewModel);
+  }
 
-    await tester.pumpWidget(CalendarApp(viewModel: viewModel));
+  testWidgets('Calendar app renders header, grid, and event button', (tester) async {
+    final (viewModel, themeViewModel) = await buildViewModels();
+
+    await tester.pumpWidget(CalendarApp(viewModel: viewModel, themeViewModel: themeViewModel));
+    await tester.pumpAndSettle();
     await tester.pumpAndSettle();
 
     // Verify AppBar title is displayed
@@ -51,10 +65,9 @@ void main() {
   });
 
   testWidgets('Swiping forward and backward changes focused month', (tester) async {
-    final repository = CalendarRepository();
-    final viewModel = CalendarViewModel(repository: repository);
+    final (viewModel, themeViewModel) = await buildViewModels();
 
-    await tester.pumpWidget(CalendarApp(viewModel: viewModel));
+    await tester.pumpWidget(CalendarApp(viewModel: viewModel, themeViewModel: themeViewModel));
     await tester.pumpAndSettle();
 
     final currentMonthLabel = DateFormat('MMMM yyyy').format(viewModel.focusedMonth);

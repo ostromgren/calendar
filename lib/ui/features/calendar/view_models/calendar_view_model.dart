@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:calendar/data/repositories/calendar_repository.dart';
+import 'package:calendar/data/repositories/settings_repository.dart';
 import 'package:calendar/domain/models/calendar_event.dart';
 import 'package:calendar/domain/models/starting_day_of_week.dart';
 
@@ -10,22 +11,28 @@ export 'package:calendar/domain/models/starting_day_of_week.dart';
 /// Holds the currently selected date, the focused month shown in the grid,
 /// user display preferences (first day of week, week number visibility),
 /// and delegates all event persistence to [CalendarRepository].
+/// Display-preference changes are automatically persisted via [SettingsRepository].
 ///
 /// Call [notifyListeners] after any mutation so that [ListenableBuilder]
 /// widgets rebuild automatically with the latest state.
 class CalendarViewModel extends ChangeNotifier {
   CalendarViewModel({
     required this.repository,
-    StartingDayOfWeek initialFirstDayOfWeek = StartingDayOfWeek.monday,
-    bool initialShowWeekNumbers = false,
-  })  : _firstDayOfWeek = initialFirstDayOfWeek,
-        _showWeekNumbers = initialShowWeekNumbers {
+    required SettingsRepository settingsRepository,
+    StartingDayOfWeek? initialFirstDayOfWeek,
+    bool? initialShowWeekNumbers,
+  })  : _settings = settingsRepository,
+        _firstDayOfWeek =
+            initialFirstDayOfWeek ?? settingsRepository.firstDayOfWeek,
+        _showWeekNumbers =
+            initialShowWeekNumbers ?? settingsRepository.showWeekNumbers {
     final now = DateTime.now();
     _selectedDate = DateTime(now.year, now.month, now.day);
     _focusedMonth = DateTime(now.year, now.month, 1);
   }
 
   final CalendarRepository repository;
+  final SettingsRepository _settings;
 
   late DateTime _selectedDate;
   late DateTime _focusedMonth;
@@ -45,6 +52,7 @@ class CalendarViewModel extends ChangeNotifier {
   void setFirstDayOfWeek(StartingDayOfWeek day) {
     if (_firstDayOfWeek != day) {
       _firstDayOfWeek = day;
+      _settings.saveFirstDayOfWeek(day);
       notifyListeners();
     }
   }
@@ -53,6 +61,7 @@ class CalendarViewModel extends ChangeNotifier {
   void setShowWeekNumbers(bool show) {
     if (_showWeekNumbers != show) {
       _showWeekNumbers = show;
+      _settings.saveShowWeekNumbers(show);
       notifyListeners();
     }
   }

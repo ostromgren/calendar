@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:calendar/data/repositories/calendar_repository.dart';
+import 'package:calendar/data/repositories/settings_repository.dart';
 import 'package:calendar/main.dart';
 import 'package:calendar/ui/core/theme.dart';
 import 'package:calendar/ui/features/calendar/view_models/calendar_view_model.dart';
@@ -15,10 +17,15 @@ void main() {
     late CalendarViewModel calendarViewModel;
     late ThemeViewModel themeViewModel;
 
-    setUp(() {
+    setUp(() async {
+      SharedPreferences.setMockInitialValues({});
+      final settings = await SettingsRepository.load();
       repository = CalendarRepository();
-      calendarViewModel = CalendarViewModel(repository: repository);
-      themeViewModel = ThemeViewModel();
+      calendarViewModel = CalendarViewModel(
+        repository: repository,
+        settingsRepository: settings,
+      );
+      themeViewModel = ThemeViewModel(settingsRepository: settings);
     });
 
     testWidgets('Settings button (cog wheel) is present in top right AppBar and opens SettingsView', (tester) async {
