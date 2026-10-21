@@ -6,13 +6,17 @@ import '../view_models/calendar_view_model.dart';
 import 'widgets/day_cell.dart';
 import 'widgets/event_tile.dart';
 import 'widgets/month_header.dart';
+import 'widgets/week_number_cell.dart';
 
 /// The main calendar screen.
 ///
 /// Renders a full monthly grid with selectable day cells and a scrollable
-/// daily event list below. Uses [CustomScrollView] with [SliverGrid] and
-/// [SliverList] so the entire page scrolls as one unified surface, avoiding
-/// layout overflows across different device sizes and orientations.
+/// daily event list below. Supports custom starting days (Monday, Sunday, Saturday)
+/// and optional ISO 8601 week number indicators.
+///
+/// Uses [CustomScrollView] with [SliverGrid] and [SliverList] so the entire page
+/// scrolls as one unified surface, avoiding layout overflows across different
+/// device sizes and orientations.
 ///
 /// Listens to [CalendarViewModel] via [ListenableBuilder] and rebuilds only
 /// when [CalendarViewModel.notifyListeners] is called.
@@ -39,23 +43,25 @@ class _CalendarViewState extends State<CalendarView> {
     _themeViewModel = widget.themeViewModel ?? ThemeViewModel();
   }
 
-  static const List<String> _weekdays = [
-    'Mon',
-    'Tue',
-    'Wed',
-    'Thu',
-    'Fri',
-    'Sat',
-    'Sun'
-  ];
+  /// Generates the ordered 7 weekday labels starting from [firstDay].
+  List<String> _buildWeekdayLabels(StartingDayOfWeek firstDay) {
+    const defaultHeaders = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    final startIndex = (firstDay.dateTimeWeekday - 1) % 7;
+    return List.generate(7, (i) => defaultHeaders[(startIndex + i) % 7]);
+  }
 
   /// Generates the list of 35 or 42 dates that make up the monthly calendar grid,
-  /// padding with days from the previous and next month to form complete weeks.
-  List<DateTime> _buildMonthGrid(DateTime focusedMonth) {
+  /// padding with days from the previous and next month to form complete weeks
+  /// starting on [firstDay].
+  List<DateTime> _buildMonthGrid(
+    DateTime focusedMonth,
+    StartingDayOfWeek firstDay,
+  ) {
     final firstDayOfMonth = DateTime(focusedMonth.year, focusedMonth.month, 1);
-    final int leadingDays = (firstDayOfMonth.weekday - DateTime.monday) % 7;
+    final int leadingDays =
+        ((firstDayOfMonth.weekday - firstDay.dateTimeWeekday) % 7 + 7) % 7;
 
-    // Start from the Monday before or on the first day of the month
+    // Start from the firstDay before or on the first day of the month
     final startDate = firstDayOfMonth.subtract(Duration(days: leadingDays));
 
     // Calculate total days (either 35 or 42 to fill all rows evenly)
@@ -70,6 +76,47 @@ class _CalendarViewState extends State<CalendarView> {
         startDate.month,
         startDate.day + index,
       ),
+    );
+  }
+
+  /// Calculates the ISO 8601 week number for a given date.
+  ///
+  /// Uses pure UTC calculations to prevent local Daylight Saving Time (DST)
+  /// transitions from truncating day differences and skewing week numbers.
+  int _getIsoWeekNumber(DateTime date) {
+    final utcDate = DateTime.utc(date.year, date.month, date.day);
+    // Find Thursday of the current week (ISO 8601 defines week 1 by Thursday)
+    final thursday = utcDate.add(Duration(days: 4 - utcDate.weekday));
+    // Find the first Thursday of that year (which is guaranteed to be in Week 1)
+    final firstDayOfYear = DateTime.utc(thursday.year, 1, 1);
+    final firstThursday = firstDayOfYear.add(
+      Duration(days: (4 - firstDayOfYear.weekday + 7) % 7),
+    );
+
+    return thursday.difference(firstThursday).inDays ~/ 7 + 1;
+  }
+
+  Widget _buildDayCell(
+    DateTime date,
+    DateTime focusedMonth,
+    DateTime selectedDate,
+    DateTime today,
+  ) {
+    final isCurrentMonth = date.month == focusedMonth.month;
+    final isToday = date.year == today.year &&
+        date.month == today.month &&
+        date.day == today.day;
+    final isSelected = date.year == selectedDate.year &&
+        date.month == selectedDate.month &&
+        date.day == selectedDate.day;
+
+    return DayCell(
+      date: date,
+      isSelected: isSelected,
+      isToday: isToday,
+      isCurrentMonth: isCurrentMonth,
+      hasEvents: widget.viewModel.hasEventsOn(date),
+      onTap: () => widget.viewModel.selectDate(date),
     );
   }
 
@@ -145,7 +192,10 @@ class _CalendarViewState extends State<CalendarView> {
         final focusedMonth = widget.viewModel.focusedMonth;
         final selectedDate = widget.viewModel.selectedDate;
         final events = widget.viewModel.selectedDateEvents;
-        final gridDays = _buildMonthGrid(focusedMonth);
+        final firstDay = widget.viewModel.firstDayOfWeek;
+        final showWeekNumbers = widget.viewModel.showWeekNumbers;
+        final gridDays = _buildMonthGrid(focusedMonth, firstDay);
+        final weekdayHeaders = _buildWeekdayLabels(firstDay);
 
         return Scaffold(
           appBar: AppBar(
@@ -160,6 +210,7 @@ class _CalendarViewState extends State<CalendarView> {
                     MaterialPageRoute(
                       builder: (context) => SettingsView(
                         themeViewModel: _themeViewModel,
+                        calendarViewModel: widget.viewModel,
                       ),
                     ),
                   );
@@ -190,24 +241,39 @@ class _CalendarViewState extends State<CalendarView> {
                   ),
                 ),
 
-                // 2. Weekday Header Row (Mon, Tue, Wed...)
+                // 2. Weekday Header Row
                 SliverToBoxAdapter(
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12.0),
+                    padding: const EdgeInsets.symmetric(horizontal: 10.0),
                     child: Row(
-                      children: _weekdays.map((day) {
-                        return Expanded(
-                          child: Center(
-                            child: Text(
-                              day,
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color: theme.colorScheme.onSurfaceVariant,
+                      children: [
+                        if (showWeekNumbers)
+                          Expanded(
+                            child: Center(
+                              child: Text(
+                                'W#',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: theme.colorScheme.outline,
+                                  fontSize: 11,
+                                ),
                               ),
                             ),
                           ),
-                        );
-                      }).toList(),
+                        ...weekdayHeaders.map((day) {
+                          return Expanded(
+                            child: Center(
+                              child: Text(
+                                day,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ),
+                          );
+                        }),
+                      ],
                     ),
                   ),
                 ),
@@ -216,35 +282,55 @@ class _CalendarViewState extends State<CalendarView> {
                   child: SizedBox(height: 6),
                 ),
 
-                // 3. Calendar Grid (7 columns)
+                // 3. Calendar Grid (7 columns, or 8 with week numbers)
                 SliverPadding(
                   padding: const EdgeInsets.symmetric(horizontal: 10.0),
                   sliver: SliverGrid(
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 7,
-                      childAspectRatio: 1.2,
+                    gridDelegate:
+                        SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: showWeekNumbers ? 8 : 7,
+                      childAspectRatio: showWeekNumbers ? 1.05 : 1.2,
                     ),
                     delegate: SliverChildBuilderDelegate(
                       (context, index) {
-                        final date = gridDays[index];
-                        final isCurrentMonth = date.month == focusedMonth.month;
-                        final isToday = date.year == today.year &&
-                            date.month == today.month &&
-                            date.day == today.day;
-                        final isSelected = date.year == selectedDate.year &&
-                            date.month == selectedDate.month &&
-                            date.day == selectedDate.day;
+                        if (showWeekNumbers) {
+                          final row = index ~/ 8;
+                          final col = index % 8;
 
-                        return DayCell(
-                          date: date,
-                          isSelected: isSelected,
-                          isToday: isToday,
-                          isCurrentMonth: isCurrentMonth,
-                          hasEvents: widget.viewModel.hasEventsOn(date),
-                          onTap: () => widget.viewModel.selectDate(date),
+                          if (col == 0) {
+                            final thursdayOffset = firstDay ==
+                                    StartingDayOfWeek.sunday
+                                ? 4
+                                : (firstDay == StartingDayOfWeek.saturday
+                                    ? 5
+                                    : 3);
+                            final weekNumber = _getIsoWeekNumber(
+                              gridDays[row * 7 + thursdayOffset],
+                            );
+                            return WeekNumberCell(weekNumber: weekNumber);
+                          }
+
+                          final dayIndex = row * 7 + (col - 1);
+                          final date = gridDays[dayIndex];
+                          return _buildDayCell(
+                            date,
+                            focusedMonth,
+                            selectedDate,
+                            today,
+                          );
+                        }
+
+                        final date = gridDays[index];
+                        return _buildDayCell(
+                          date,
+                          focusedMonth,
+                          selectedDate,
+                          today,
                         );
                       },
-                      childCount: gridDays.length,
+                      childCount: showWeekNumbers
+                          ? (gridDays.length ~/ 7) * 8
+                          : gridDays.length,
                     ),
                   ),
                 ),
@@ -531,4 +617,3 @@ class _AddEventBottomSheetState extends State<_AddEventBottomSheet> {
     );
   }
 }
-

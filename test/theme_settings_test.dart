@@ -6,6 +6,7 @@ import 'package:calendar/ui/core/theme.dart';
 import 'package:calendar/ui/features/calendar/view_models/calendar_view_model.dart';
 import 'package:calendar/ui/features/settings/view_models/theme_view_model.dart';
 import 'package:calendar/ui/features/settings/views/settings_view.dart';
+import 'package:calendar/ui/features/calendar/views/widgets/week_number_cell.dart';
 import 'package:calendar/ui/features/settings/views/theme_selection_view.dart';
 
 void main() {
@@ -145,6 +146,109 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(themeViewModel.themeMode, ThemeMode.system);
+    });
+
+    testWidgets('Changing First Day of Week in SettingsView updates calendar grid and headers', (tester) async {
+      await tester.pumpWidget(CalendarApp(
+        viewModel: calendarViewModel,
+        themeViewModel: themeViewModel,
+      ));
+      await tester.pumpAndSettle();
+
+      // Open settings
+      await tester.tap(find.byTooltip('Settings'));
+      await tester.pumpAndSettle();
+
+      // Tap dropdown for First Day of Week
+      await tester.tap(find.byType(DropdownButton<StartingDayOfWeek>));
+      await tester.pumpAndSettle();
+
+      // Select 'Sunday'
+      await tester.tap(find.text('Sunday').last);
+      await tester.pumpAndSettle();
+
+      expect(calendarViewModel.firstDayOfWeek, StartingDayOfWeek.sunday);
+
+      // Return to calendar
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+
+      // Verify Sun is the first header
+      final sunFinder = find.text('Sun');
+      final monFinder = find.text('Mon');
+      expect(sunFinder, findsOneWidget);
+      expect(monFinder, findsOneWidget);
+      expect(tester.getTopLeft(sunFinder).dx < tester.getTopLeft(monFinder).dx, isTrue);
+
+      // Open settings again and select Saturday
+      await tester.tap(find.byTooltip('Settings'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byType(DropdownButton<StartingDayOfWeek>));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Saturday').last);
+      await tester.pumpAndSettle();
+
+      expect(calendarViewModel.firstDayOfWeek, StartingDayOfWeek.saturday);
+
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+
+      final satFinder = find.text('Sat');
+      expect(satFinder, findsOneWidget);
+      expect(tester.getTopLeft(satFinder).dx < tester.getTopLeft(sunFinder).dx, isTrue);
+    });
+
+    testWidgets('Toggling Show Week Numbers in SettingsView updates calendar view', (tester) async {
+      await tester.pumpWidget(CalendarApp(
+        viewModel: calendarViewModel,
+        themeViewModel: themeViewModel,
+      ));
+      await tester.pumpAndSettle();
+
+      // Initially no 'W#' header
+      expect(find.text('W#'), findsNothing);
+
+      // Open settings
+      await tester.tap(find.byTooltip('Settings'));
+      await tester.pumpAndSettle();
+
+      // Toggle 'Show Week Numbers' switch
+      await tester.tap(find.widgetWithText(SwitchListTile, 'Show Week Numbers'));
+      await tester.pumpAndSettle();
+
+      expect(calendarViewModel.showWeekNumbers, isTrue);
+
+      // Return to calendar
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+
+      // Verify 'W#' column header is displayed
+      expect(find.text('W#'), findsOneWidget);
+
+      // Verify week numbers are present in the grid including Week 43 (current week)
+      expect(find.byType(WeekNumberCell), findsWidgets);
+      expect(find.text('40'), findsOneWidget);
+      expect(find.text('41'), findsOneWidget);
+      expect(find.text('42'), findsOneWidget);
+      expect(find.text('43'), findsOneWidget); // Week of October 19–25, 2026
+      expect(find.text('44'), findsOneWidget);
+
+      // Go back to settings and turn off
+      await tester.tap(find.byTooltip('Settings'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.widgetWithText(SwitchListTile, 'Show Week Numbers'));
+      await tester.pumpAndSettle();
+
+      expect(calendarViewModel.showWeekNumbers, isFalse);
+
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+
+      expect(find.text('W#'), findsNothing);
+      expect(find.byType(WeekNumberCell), findsNothing);
     });
 
     test('AppTheme.createTheme generates valid light and dark ThemeData with dynamic and seed colors', () {

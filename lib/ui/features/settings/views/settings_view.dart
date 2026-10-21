@@ -1,27 +1,39 @@
 import 'package:flutter/material.dart';
+import '../../calendar/view_models/calendar_view_model.dart';
 import '../view_models/theme_view_model.dart';
 import 'theme_selection_view.dart';
 
 /// The application settings view.
 ///
-/// Houses app preferences such as [ThemeSelectionView] and is structured
-/// to easily accommodate upcoming settings forward (e.g., calendar defaults,
-/// reminders, first day of week).
+/// Houses app preferences such as [ThemeSelectionView], calendar starting day,
+/// and week number visibility. Structured to easily accommodate upcoming
+/// preferences forward.
 class SettingsView extends StatefulWidget {
   const SettingsView({
     super.key,
     required this.themeViewModel,
+    this.calendarViewModel,
   });
 
   final ThemeViewModel themeViewModel;
+  final CalendarViewModel? calendarViewModel;
 
   @override
   State<SettingsView> createState() => _SettingsViewState();
 }
 
 class _SettingsViewState extends State<SettingsView> {
-  bool _showWeekNumbers = false;
-  String _firstDayOfWeek = 'Monday';
+  // Local fallback state if calendarViewModel is not provided
+  late bool _showWeekNumbers;
+  late StartingDayOfWeek _firstDayOfWeek;
+
+  @override
+  void initState() {
+    super.initState();
+    _showWeekNumbers = widget.calendarViewModel?.showWeekNumbers ?? false;
+    _firstDayOfWeek =
+        widget.calendarViewModel?.firstDayOfWeek ?? StartingDayOfWeek.monday;
+  }
 
   String _formatThemeMode(ThemeMode mode) {
     switch (mode) {
@@ -38,16 +50,23 @@ class _SettingsViewState extends State<SettingsView> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final calendarVm = widget.calendarViewModel;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Settings'),
       ),
       body: ListenableBuilder(
-        listenable: widget.themeViewModel,
+        listenable: Listenable.merge([
+          widget.themeViewModel,
+          ?calendarVm,
+        ]),
         builder: (context, _) {
           final currentTheme = widget.themeViewModel.currentTheme;
           final currentMode = widget.themeViewModel.themeMode;
+          final activeFirstDay = calendarVm?.firstDayOfWeek ?? _firstDayOfWeek;
+          final activeShowWeekNumbers =
+              calendarVm?.showWeekNumbers ?? _showWeekNumbers;
 
           return ListView(
             children: [
@@ -89,7 +108,7 @@ class _SettingsViewState extends State<SettingsView> {
 
               const Divider(height: 24),
 
-              // 2. Calendar Preferences Section (Extensible for future settings)
+              // 2. Calendar Preferences Section
               _buildSectionHeader(context, 'Calendar Preferences'),
               ListTile(
                 leading: Container(
@@ -109,18 +128,20 @@ class _SettingsViewState extends State<SettingsView> {
                   'First Day of Week',
                   style: TextStyle(fontWeight: FontWeight.w600),
                 ),
-                subtitle: Text(_firstDayOfWeek),
-                trailing: DropdownButton<String>(
-                  value: _firstDayOfWeek,
+                subtitle: Text(activeFirstDay.label),
+                trailing: DropdownButton<StartingDayOfWeek>(
+                  value: activeFirstDay,
                   underline: const SizedBox.shrink(),
-                  items: const [
-                    DropdownMenuItem(value: 'Monday', child: Text('Monday')),
-                    DropdownMenuItem(value: 'Sunday', child: Text('Sunday')),
-                    DropdownMenuItem(value: 'Saturday', child: Text('Saturday')),
-                  ],
+                  items: StartingDayOfWeek.values.map((day) {
+                    return DropdownMenuItem(
+                      value: day,
+                      child: Text(day.label),
+                    );
+                  }).toList(),
                   onChanged: (val) {
                     if (val != null) {
                       setState(() => _firstDayOfWeek = val);
+                      widget.calendarViewModel?.setFirstDayOfWeek(val);
                     }
                   },
                 ),
@@ -144,9 +165,10 @@ class _SettingsViewState extends State<SettingsView> {
                   style: TextStyle(fontWeight: FontWeight.w600),
                 ),
                 subtitle: const Text('Display week indicators on calendar rows'),
-                value: _showWeekNumbers,
+                value: activeShowWeekNumbers,
                 onChanged: (val) {
                   setState(() => _showWeekNumbers = val);
+                  widget.calendarViewModel?.setShowWeekNumbers(val);
                 },
               ),
 
