@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../../settings/view_models/theme_view_model.dart';
+import '../../settings/views/settings_view.dart';
 import '../view_models/calendar_view_model.dart';
 import 'widgets/day_cell.dart';
 import 'widgets/event_tile.dart';
@@ -15,15 +17,28 @@ import 'widgets/month_header.dart';
 /// Listens to [CalendarViewModel] via [ListenableBuilder] and rebuilds only
 /// when [CalendarViewModel.notifyListeners] is called.
 class CalendarView extends StatefulWidget {
-  const CalendarView({super.key, required this.viewModel});
+  const CalendarView({
+    super.key,
+    required this.viewModel,
+    this.themeViewModel,
+  });
 
   final CalendarViewModel viewModel;
+  final ThemeViewModel? themeViewModel;
 
   @override
   State<CalendarView> createState() => _CalendarViewState();
 }
 
 class _CalendarViewState extends State<CalendarView> {
+  late final ThemeViewModel _themeViewModel;
+
+  @override
+  void initState() {
+    super.initState();
+    _themeViewModel = widget.themeViewModel ?? ThemeViewModel();
+  }
+
   static const List<String> _weekdays = [
     'Mon',
     'Tue',
@@ -136,6 +151,21 @@ class _CalendarViewState extends State<CalendarView> {
           appBar: AppBar(
             title: const Text('My Calendar'),
             centerTitle: true,
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.settings),
+                tooltip: 'Settings',
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => SettingsView(
+                        themeViewModel: _themeViewModel,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ],
           ),
           floatingActionButton: FloatingActionButton.extended(
             onPressed: () => _showAddEventDialog(context),
