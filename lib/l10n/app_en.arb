@@ -1,0 +1,120 @@
+{
+  "@@locale": "en",
+  "appTitle": "Calendar",
+  "myCalendar": "My Calendar",
+  "settings": "Settings",
+  "newEvent": "New Event",
+  "today": "Today",
+  "previousMonth": "Previous month",
+  "nextMonth": "Next month",
+  "weekNumberShort": "W#",
+  "eventCount": "{count, plural, =1{1 event} other{{count} events}}",
+  "@eventCount": {
+    "description": "Number of events scheduled on the selected date",
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
+  "noEventsScheduled": "No events scheduled",
+  "addEvent": "Add Event",
+  "forDate": "For {date}",
+  "@forDate": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "eventTitle": "Event Title",
+  "descriptionOptional": "Description (optional)",
+  "saveToCalendar": "Save to calendar",
+  "savedLocallyOnDevice": "Saved locally on this device",
+  "personalCalendar": "Personal",
+  "startTime": "Start: {time}",
+  "@startTime": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "endTime": "End: {time}",
+  "@endTime": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "saveEvent": "Save Event",
+  "wholeDay": "Whole day",
+  "invalidCalendarFile": "No calendar events were found in the selected file.",
+  "calendarFileReadError": "Unable to read the selected calendar file: {error}",
+  "@calendarFileReadError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "deleteEvent": "Delete event",
+  "appearance": "Appearance",
+  "themes": "Themes",
+  "systemMode": "System Mode",
+  "lightMode": "Light Mode",
+  "darkMode": "Dark Mode",
+  "calendarPreferences": "Calendar Preferences",
+  "language": "Language",
+  "systemLanguage": "System",
+  "englishLanguage": "English",
+  "swedishLanguage": "Swedish",
+  "firstDayOfWeek": "First Day of Week",
+  "monday": "Monday",
+  "sunday": "Sunday",
+  "saturday": "Saturday",
+  "showWeekNumbers": "Show Week Numbers",
+  "weekNumbersDescription": "Display week indicators on calendar rows",
+  "about": "About",
+  "versionInfo": "Version 1.0.0 • Material 3 & Dynamic Color",
+  "livePreview": "Live Preview",
+  "brightness": "Brightness",
+  "systemBrightness": "System",
+  "light": "Light",
+  "dark": "Dark",
+  "dynamicSystemTheme": "Dynamic System Theme",
+  "dynamicThemeDescription": "Special theme for Android (and supported systems) matching your wallpaper and chosen Color Palette.",
+  "curatedColorThemes": "Curated Color Themes",
+  "androidMaterialYou": "Android Material You",
+  "dynamicColorInfo": "On Android 12+, colors dynamically match your wallpaper palette choice. On other platforms, uses modern default tones.",
+  "systemPaletteTheme": "System Palette (Material You)",
+  "systemPaletteDescription": "Follows Android wallpaper & system color palette",
+  "oceanBlueTheme": "Ocean Blue",
+  "oceanBlueDescription": "Classic royal blue with crisp indigo tones",
+  "emeraldForestTheme": "Emerald Forest",
+  "emeraldForestDescription": "Natural rich emerald and soothing sage",
+  "sunsetAmberTheme": "Sunset Amber",
+  "sunsetAmberDescription": "Warm terracotta, golden amber, and dusk glow",
+  "deepPurpleTheme": "Deep Purple",
+  "deepPurpleDescription": "Rich imperial violet with elegant lavender",
+  "roseCrimsonTheme": "Rose Crimson",
+  "roseCrimsonDescription": "Modern ruby red with soft crimson blush",
+  "mondayShort": "Mon",
+  "tuesdayShort": "Tue",
+  "wednesdayShort": "Wed",
+  "thursdayShort": "Thu",
+  "fridayShort": "Fri",
+  "saturdayShort": "Sat",
+  "sundayShort": "Sun",
+  "weekTooltip": "Week {week}",
+  "@weekTooltip": {
+    "placeholders": {
+      "week": {
+        "type": "int"
+      }
+    }
+  },
+  "themePreviewMonth": "October 2026",
+  "themePreviewEvent": "10:00 - Team Kickoff Sync"
+}

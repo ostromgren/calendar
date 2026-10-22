@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:calendar/data/repositories/calendar_repository.dart';
 import 'package:calendar/data/repositories/settings_repository.dart';
 import 'package:calendar/domain/models/calendar_event.dart';
+import 'package:calendar/domain/models/local_calendar.dart';
 import 'package:calendar/domain/models/starting_day_of_week.dart';
 
 export 'package:calendar/domain/models/starting_day_of_week.dart';
@@ -21,11 +22,12 @@ class CalendarViewModel extends ChangeNotifier {
     required SettingsRepository settingsRepository,
     StartingDayOfWeek? initialFirstDayOfWeek,
     bool? initialShowWeekNumbers,
-  })  : _settings = settingsRepository,
-        _firstDayOfWeek =
-            initialFirstDayOfWeek ?? settingsRepository.firstDayOfWeek,
-        _showWeekNumbers =
-            initialShowWeekNumbers ?? settingsRepository.showWeekNumbers {
+  }) : _settings = settingsRepository,
+       _firstDayOfWeek =
+           initialFirstDayOfWeek ?? settingsRepository.firstDayOfWeek,
+       _showWeekNumbers =
+           initialShowWeekNumbers ?? settingsRepository.showWeekNumbers,
+       _lastUsedCalendar = settingsRepository.lastUsedCalendar {
     final now = DateTime.now();
     _selectedDate = DateTime(now.year, now.month, now.day);
     _focusedMonth = DateTime(now.year, now.month, 1);
@@ -38,6 +40,7 @@ class CalendarViewModel extends ChangeNotifier {
   late DateTime _focusedMonth;
   StartingDayOfWeek _firstDayOfWeek;
   bool _showWeekNumbers;
+  LocalCalendar _lastUsedCalendar;
 
   DateTime get selectedDate => _selectedDate;
   DateTime get focusedMonth => _focusedMonth;
@@ -47,6 +50,9 @@ class CalendarViewModel extends ChangeNotifier {
 
   /// Whether row-level week indicators (1-53) are displayed.
   bool get showWeekNumbers => _showWeekNumbers;
+
+  /// Calendar selected by default when adding the next event.
+  LocalCalendar get lastUsedCalendar => _lastUsedCalendar;
 
   /// Updates the starting day of the week and notifies observing widgets.
   void setFirstDayOfWeek(StartingDayOfWeek day) {
@@ -104,15 +110,21 @@ class CalendarViewModel extends ChangeNotifier {
     required String description,
     required DateTime startTime,
     required DateTime endTime,
+    required LocalCalendar calendar,
+    bool isAllDay = false,
   }) {
     final newEvent = CalendarEvent(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       title: title,
       description: description,
+      calendarId: calendar.id,
       startTime: startTime,
       endTime: endTime,
+      isAllDay: isAllDay,
     );
     repository.addEvent(newEvent);
+    _lastUsedCalendar = calendar;
+    _settings.saveLastUsedCalendar(calendar);
     notifyListeners();
   }
 

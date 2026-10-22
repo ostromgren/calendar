@@ -6,9 +6,11 @@ class WeekNumberCell extends StatelessWidget {
   const WeekNumberCell({
     super.key,
     required this.weekNumber,
+    required this.tooltipBuilder,
   });
 
   final int weekNumber;
+  final String Function(int week) tooltipBuilder;
 
   @override
   Widget build(BuildContext context) {
@@ -17,7 +19,7 @@ class WeekNumberCell extends StatelessWidget {
 
     return Center(
       child: Tooltip(
-        message: 'Week $weekNumber',
+        message: tooltipBuilder(weekNumber),
         child: Container(
           margin: const EdgeInsets.all(2),
           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),

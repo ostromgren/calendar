@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:calendar/l10n/generated/app_localizations.dart';
+
+import '../../../../data/calendar_intent_service.dart';
+import '../../../../domain/models/external_calendar_event.dart';
 import '../../settings/view_models/theme_view_model.dart';
 import '../../settings/views/settings_view.dart';
+import '../../../../domain/models/local_calendar.dart';
 import '../view_models/calendar_view_model.dart';
 import 'widgets/day_cell.dart';
 import 'widgets/event_tile.dart';
@@ -25,10 +30,12 @@ class CalendarView extends StatefulWidget {
     super.key,
     required this.viewModel,
     required this.themeViewModel,
+    this.intentService,
   });
 
   final CalendarViewModel viewModel;
   final ThemeViewModel themeViewModel;
+  final CalendarIntentService? intentService;
 
   @override
   State<CalendarView> createState() => _CalendarViewState();
@@ -36,12 +43,80 @@ class CalendarView extends StatefulWidget {
 
 class _CalendarViewState extends State<CalendarView> {
   ThemeViewModel get _themeViewModel => widget.themeViewModel;
+  bool _processingIncomingEvents = false;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.intentService?.addListener(_processIncomingEvents);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _processIncomingEvents();
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant CalendarView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.intentService != widget.intentService) {
+      oldWidget.intentService?.removeListener(_processIncomingEvents);
+      widget.intentService?.addListener(_processIncomingEvents);
+      _processIncomingEvents();
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.intentService?.removeListener(_processIncomingEvents);
+    super.dispose();
+  }
+
+  Future<void> _processIncomingEvents() async {
+    final service = widget.intentService;
+    if (!mounted || _processingIncomingEvents || service == null) return;
+
+    _processingIncomingEvents = true;
+    try {
+      while (mounted && service.hasPendingEvents) {
+        final event = service.takeNextEvent();
+        widget.viewModel.selectDate(event.startTime);
+        await _showAddEventDialog(context, event);
+      }
+    } finally {
+      _processingIncomingEvents = false;
+    }
+    if (mounted) {
+      final error = service.takeError();
+      if (error != null) {
+        final l10n = AppLocalizations.of(context)!;
+        final message = switch (error.message) {
+          'invalidCalendarFile' => l10n.invalidCalendarFile,
+          'calendarFileReadError' => l10n.calendarFileReadError(
+            error.details ?? '',
+          ),
+          _ => error.message,
+        };
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(message)));
+      }
+    }
+  }
 
   /// Generates the ordered 7 weekday labels starting from [firstDay].
-  List<String> _buildWeekdayLabels(StartingDayOfWeek firstDay) {
-    const defaultHeaders = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  List<String> _buildWeekdayLabels(
+    StartingDayOfWeek firstDay,
+    AppLocalizations l10n,
+  ) {
+    final labels = [
+      l10n.mondayShort,
+      l10n.tuesdayShort,
+      l10n.wednesdayShort,
+      l10n.thursdayShort,
+      l10n.fridayShort,
+      l10n.saturdayShort,
+      l10n.sundayShort,
+    ];
     final startIndex = (firstDay.dateTimeWeekday - 1) % 7;
-    return List.generate(7, (i) => defaultHeaders[(startIndex + i) % 7]);
+    return List.generate(7, (i) => labels[(startIndex + i) % 7]);
   }
 
   /// Generates the list of 35 or 42 dates that make up the monthly calendar grid,
@@ -59,17 +134,17 @@ class _CalendarViewState extends State<CalendarView> {
     final startDate = firstDayOfMonth.subtract(Duration(days: leadingDays));
 
     // Calculate total days (either 35 or 42 to fill all rows evenly)
-    final daysInMonth =
-        DateTime(focusedMonth.year, focusedMonth.month + 1, 0).day;
+    final daysInMonth = DateTime(
+      focusedMonth.year,
+      focusedMonth.month + 1,
+      0,
+    ).day;
     final totalCells = (leadingDays + daysInMonth) > 35 ? 42 : 35;
 
     return List.generate(
       totalCells,
-      (index) => DateTime(
-        startDate.year,
-        startDate.month,
-        startDate.day + index,
-      ),
+      (index) =>
+          DateTime(startDate.year, startDate.month, startDate.day + index),
     );
   }
 
@@ -97,10 +172,12 @@ class _CalendarViewState extends State<CalendarView> {
     DateTime today,
   ) {
     final isCurrentMonth = date.month == focusedMonth.month;
-    final isToday = date.year == today.year &&
+    final isToday =
+        date.year == today.year &&
         date.month == today.month &&
         date.day == today.day;
-    final isSelected = date.year == selectedDate.year &&
+    final isSelected =
+        date.year == selectedDate.year &&
         date.month == selectedDate.month &&
         date.day == selectedDate.day;
 
@@ -145,8 +222,11 @@ class _CalendarViewState extends State<CalendarView> {
     _horizontalDragDelta = 0;
   }
 
-  void _showAddEventDialog(BuildContext context) {
-    showModalBottomSheet<void>(
+  Future<void> _showAddEventDialog(
+    BuildContext context, [
+    ExternalCalendarEvent? initialEvent,
+  ]) {
+    return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
@@ -155,20 +235,28 @@ class _CalendarViewState extends State<CalendarView> {
       ),
       builder: (sheetContext) {
         return _AddEventBottomSheet(
-          selectedDate: widget.viewModel.selectedDate,
-          onSave: ({
-            required String title,
-            required String description,
-            required DateTime startTime,
-            required DateTime endTime,
-          }) {
-            widget.viewModel.addEvent(
-              title: title,
-              description: description,
-              startTime: startTime,
-              endTime: endTime,
-            );
-          },
+          selectedDate:
+              initialEvent?.startTime ?? widget.viewModel.selectedDate,
+          initialCalendar: widget.viewModel.lastUsedCalendar,
+          initialEvent: initialEvent,
+          onSave:
+              ({
+                required String title,
+                required String description,
+                required DateTime startTime,
+                required DateTime endTime,
+                required LocalCalendar calendar,
+                required bool isAllDay,
+              }) {
+                widget.viewModel.addEvent(
+                  title: title,
+                  description: description,
+                  startTime: startTime,
+                  endTime: endTime,
+                  calendar: calendar,
+                  isAllDay: isAllDay,
+                );
+              },
         );
       },
     );
@@ -177,6 +265,8 @@ class _CalendarViewState extends State<CalendarView> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
+    final locale = Localizations.localeOf(context).toString();
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
 
@@ -189,16 +279,16 @@ class _CalendarViewState extends State<CalendarView> {
         final firstDay = widget.viewModel.firstDayOfWeek;
         final showWeekNumbers = widget.viewModel.showWeekNumbers;
         final gridDays = _buildMonthGrid(focusedMonth, firstDay);
-        final weekdayHeaders = _buildWeekdayLabels(firstDay);
+        final weekdayHeaders = _buildWeekdayLabels(firstDay, l10n);
 
         return Scaffold(
           appBar: AppBar(
-            title: const Text('My Calendar'),
+            title: Text(l10n.myCalendar),
             centerTitle: true,
             actions: [
               IconButton(
                 icon: const Icon(Icons.settings),
-                tooltip: 'Settings',
+                tooltip: l10n.settings,
                 onPressed: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(
@@ -215,7 +305,7 @@ class _CalendarViewState extends State<CalendarView> {
           floatingActionButton: FloatingActionButton.extended(
             onPressed: () => _showAddEventDialog(context),
             icon: const Icon(Icons.add),
-            label: const Text('New Event'),
+            label: Text(l10n.newEvent),
           ),
           body: GestureDetector(
             behavior: HitTestBehavior.translucent,
@@ -245,7 +335,7 @@ class _CalendarViewState extends State<CalendarView> {
                           Expanded(
                             child: Center(
                               child: Text(
-                                'W#',
+                                l10n.weekNumberShort,
                                 style: theme.textTheme.bodySmall?.copyWith(
                                   fontWeight: FontWeight.bold,
                                   color: theme.colorScheme.outline,
@@ -272,16 +362,13 @@ class _CalendarViewState extends State<CalendarView> {
                   ),
                 ),
 
-                const SliverToBoxAdapter(
-                  child: SizedBox(height: 6),
-                ),
+                const SliverToBoxAdapter(child: SizedBox(height: 6)),
 
                 // 3. Calendar Grid (7 columns, or 8 with week numbers)
                 SliverPadding(
                   padding: const EdgeInsets.symmetric(horizontal: 10.0),
                   sliver: SliverGrid(
-                    gridDelegate:
-                        SliverGridDelegateWithFixedCrossAxisCount(
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: showWeekNumbers ? 8 : 7,
                       childAspectRatio: showWeekNumbers ? 1.05 : 1.2,
                     ),
@@ -292,16 +379,19 @@ class _CalendarViewState extends State<CalendarView> {
                           final col = index % 8;
 
                           if (col == 0) {
-                            final thursdayOffset = firstDay ==
-                                    StartingDayOfWeek.sunday
+                            final thursdayOffset =
+                                firstDay == StartingDayOfWeek.sunday
                                 ? 4
                                 : (firstDay == StartingDayOfWeek.saturday
-                                    ? 5
-                                    : 3);
+                                      ? 5
+                                      : 3);
                             final weekNumber = _getIsoWeekNumber(
                               gridDays[row * 7 + thursdayOffset],
                             );
-                            return WeekNumberCell(weekNumber: weekNumber);
+                            return WeekNumberCell(
+                              weekNumber: weekNumber,
+                              tooltipBuilder: l10n.weekTooltip,
+                            );
                           }
 
                           final dayIndex = row * 7 + (col - 1);
@@ -329,9 +419,7 @@ class _CalendarViewState extends State<CalendarView> {
                   ),
                 ),
 
-                const SliverToBoxAdapter(
-                  child: Divider(height: 16),
-                ),
+                const SliverToBoxAdapter(child: Divider(height: 16)),
 
                 // 4. Selected Date Summary Header
                 SliverToBoxAdapter(
@@ -344,13 +432,16 @@ class _CalendarViewState extends State<CalendarView> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          DateFormat('EEEE, MMM d').format(selectedDate),
+                          DateFormat(
+                            'EEEE, MMM d',
+                            locale,
+                          ).format(selectedDate),
                           style: theme.textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                         Text(
-                          '${events.length} ${events.length == 1 ? 'event' : 'events'}',
+                          l10n.eventCount(events.length),
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: theme.colorScheme.primary,
                           ),
@@ -376,7 +467,7 @@ class _CalendarViewState extends State<CalendarView> {
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              'No events scheduled',
+                              l10n.noEventsScheduled,
                               style: theme.textTheme.bodyMedium?.copyWith(
                                 color: theme.colorScheme.outline,
                               ),
@@ -399,9 +490,7 @@ class _CalendarViewState extends State<CalendarView> {
                   ),
 
                 // Bottom padding so content is never obscured by the FloatingActionButton
-                const SliverToBoxAdapter(
-                  child: SizedBox(height: 80),
-                ),
+                const SliverToBoxAdapter(child: SizedBox(height: 80)),
               ],
             ),
           ),
@@ -419,16 +508,23 @@ class _CalendarViewState extends State<CalendarView> {
 class _AddEventBottomSheet extends StatefulWidget {
   const _AddEventBottomSheet({
     required this.selectedDate,
+    required this.initialCalendar,
+    this.initialEvent,
     required this.onSave,
   });
 
   final DateTime selectedDate;
+  final LocalCalendar initialCalendar;
+  final ExternalCalendarEvent? initialEvent;
   final void Function({
     required String title,
     required String description,
     required DateTime startTime,
     required DateTime endTime,
-  }) onSave;
+    required LocalCalendar calendar,
+    required bool isAllDay,
+  })
+  onSave;
 
   @override
   State<_AddEventBottomSheet> createState() => _AddEventBottomSheetState();
@@ -440,14 +536,26 @@ class _AddEventBottomSheetState extends State<_AddEventBottomSheet> {
   late final FocusNode _titleFocusNode;
   TimeOfDay _startTime = const TimeOfDay(hour: 9, minute: 0);
   TimeOfDay _endTime = const TimeOfDay(hour: 10, minute: 0);
+  bool _isAllDay = false;
+  late LocalCalendar _selectedCalendar;
   Animation<double>? _routeAnimation;
 
   @override
   void initState() {
     super.initState();
-    _titleController = TextEditingController();
-    _descriptionController = TextEditingController();
+    _titleController = TextEditingController(
+      text: widget.initialEvent?.title ?? '',
+    );
+    _descriptionController = TextEditingController(
+      text: widget.initialEvent?.description ?? '',
+    );
     _titleFocusNode = FocusNode();
+    _selectedCalendar = widget.initialCalendar;
+    _isAllDay = widget.initialEvent?.isAllDay ?? false;
+    if (widget.initialEvent != null && !_isAllDay) {
+      _startTime = TimeOfDay.fromDateTime(widget.initialEvent!.startTime);
+      _endTime = TimeOfDay.fromDateTime(widget.initialEvent!.endTime);
+    }
 
     // Defer focusing the title TextField until after the bottom sheet's
     // entrance animation completes. This prevents Android's software keyboard
@@ -486,8 +594,12 @@ class _AddEventBottomSheetState extends State<_AddEventBottomSheet> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final selectedDateFormatted =
-        DateFormat('EEEE, MMM d, yyyy').format(widget.selectedDate);
+    final l10n = AppLocalizations.of(context)!;
+    final locale = Localizations.localeOf(context).toString();
+    final selectedDateFormatted = DateFormat(
+      'EEEE, MMM d, yyyy',
+      locale,
+    ).format(widget.selectedDate);
 
     return Padding(
       padding: EdgeInsets.only(
@@ -502,14 +614,14 @@ class _AddEventBottomSheetState extends State<_AddEventBottomSheet> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Add Event',
+              l10n.addEvent,
               style: theme.textTheme.headlineSmall?.copyWith(
                 fontWeight: FontWeight.bold,
               ),
             ),
             const SizedBox(height: 4),
             Text(
-              'For $selectedDateFormatted',
+              l10n.forDate(selectedDateFormatted),
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.colorScheme.primary,
               ),
@@ -518,8 +630,8 @@ class _AddEventBottomSheetState extends State<_AddEventBottomSheet> {
             TextField(
               controller: _titleController,
               focusNode: _titleFocusNode,
-              decoration: const InputDecoration(
-                labelText: 'Event Title',
+              decoration: InputDecoration(
+                labelText: l10n.eventTitle,
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.event),
               ),
@@ -527,48 +639,84 @@ class _AddEventBottomSheetState extends State<_AddEventBottomSheet> {
             const SizedBox(height: 12),
             TextField(
               controller: _descriptionController,
-              decoration: const InputDecoration(
-                labelText: 'Description (optional)',
+              decoration: InputDecoration(
+                labelText: l10n.descriptionOptional,
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.notes),
               ),
             ),
             const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    icon: const Icon(Icons.schedule),
-                    label: Text('Start: ${_startTime.format(context)}'),
-                    onPressed: () async {
-                      final picked = await showTimePicker(
-                        context: context,
-                        initialTime: _startTime,
-                      );
-                      if (picked != null) {
-                        setState(() => _startTime = picked);
-                      }
-                    },
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    icon: const Icon(Icons.schedule),
-                    label: Text('End: ${_endTime.format(context)}'),
-                    onPressed: () async {
-                      final picked = await showTimePicker(
-                        context: context,
-                        initialTime: _endTime,
-                      );
-                      if (picked != null) {
-                        setState(() => _endTime = picked);
-                      }
-                    },
-                  ),
-                ),
-              ],
+            DropdownButtonFormField<LocalCalendar>(
+              key: const ValueKey('event-calendar-dropdown'),
+              initialValue: _selectedCalendar,
+              decoration: InputDecoration(
+                labelText: l10n.saveToCalendar,
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.calendar_month),
+                helperText: l10n.savedLocallyOnDevice,
+              ),
+              items: LocalCalendar.all
+                  .map(
+                    (calendar) => DropdownMenuItem(
+                      value: calendar,
+                      child: Text(l10n.personalCalendar),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (calendar) {
+                if (calendar != null) {
+                  setState(() => _selectedCalendar = calendar);
+                }
+              },
             ),
+            const SizedBox(height: 16),
+            CheckboxListTile(
+              key: const ValueKey('event-all-day-checkbox'),
+              contentPadding: EdgeInsets.zero,
+              title: Text(l10n.wholeDay),
+              value: _isAllDay,
+              controlAffinity: ListTileControlAffinity.leading,
+              onChanged: (isAllDay) {
+                setState(() => _isAllDay = isAllDay ?? false);
+              },
+            ),
+            if (!_isAllDay) ...[
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      icon: const Icon(Icons.schedule),
+                      label: Text(l10n.startTime(_startTime.format(context))),
+                      onPressed: () async {
+                        final picked = await showTimePicker(
+                          context: context,
+                          initialTime: _startTime,
+                        );
+                        if (picked != null) {
+                          setState(() => _startTime = picked);
+                        }
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      icon: const Icon(Icons.schedule),
+                      label: Text(l10n.endTime(_endTime.format(context))),
+                      onPressed: () async {
+                        final picked = await showTimePicker(
+                          context: context,
+                          initialTime: _endTime,
+                        );
+                        if (picked != null) {
+                          setState(() => _endTime = picked);
+                        }
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ],
             const SizedBox(height: 20),
             SizedBox(
               width: double.infinity,
@@ -582,15 +730,15 @@ class _AddEventBottomSheetState extends State<_AddEventBottomSheet> {
                     date.year,
                     date.month,
                     date.day,
-                    _startTime.hour,
-                    _startTime.minute,
+                    _isAllDay ? 0 : _startTime.hour,
+                    _isAllDay ? 0 : _startTime.minute,
                   );
                   final endDateTime = DateTime(
                     date.year,
                     date.month,
                     date.day,
-                    _endTime.hour,
-                    _endTime.minute,
+                    _isAllDay ? 0 : _endTime.hour,
+                    _isAllDay ? 0 : _endTime.minute,
                   );
 
                   widget.onSave(
@@ -598,11 +746,13 @@ class _AddEventBottomSheetState extends State<_AddEventBottomSheet> {
                     description: _descriptionController.text.trim(),
                     startTime: startDateTime,
                     endTime: endDateTime,
+                    calendar: _selectedCalendar,
+                    isAllDay: _isAllDay,
                   );
 
                   Navigator.of(context).pop();
                 },
-                child: const Text('Save Event'),
+                child: Text(l10n.saveEvent),
               ),
             ),
           ],

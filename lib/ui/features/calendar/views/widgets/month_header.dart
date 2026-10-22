@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:calendar/l10n/generated/app_localizations.dart';
 
 /// Month header with month/year title, previous/next controls, and a "Today" shortcut.
 class MonthHeader extends StatelessWidget {
@@ -19,7 +20,9 @@ class MonthHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final monthLabel = DateFormat('MMMM yyyy').format(focusedMonth);
+    final l10n = AppLocalizations.of(context)!;
+    final locale = Localizations.localeOf(context).toString();
+    final monthLabel = DateFormat('MMMM yyyy', locale).format(focusedMonth);
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
@@ -34,18 +37,15 @@ class MonthHeader extends StatelessWidget {
           ),
           Row(
             children: [
-              TextButton(
-                onPressed: onToday,
-                child: const Text('Today'),
-              ),
+              TextButton(onPressed: onToday, child: Text(l10n.today)),
               IconButton(
                 icon: const Icon(Icons.chevron_left),
-                tooltip: 'Previous month',
+                tooltip: l10n.previousMonth,
                 onPressed: onPreviousMonth,
               ),
               IconButton(
                 icon: const Icon(Icons.chevron_right),
-                tooltip: 'Next month',
+                tooltip: l10n.nextMonth,
                 onPressed: onNextMonth,
               ),
             ],

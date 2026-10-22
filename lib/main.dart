@@ -1,5 +1,9 @@
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:calendar/l10n/generated/app_localizations.dart';
+
+import 'data/calendar_intent_service.dart';
 import 'data/repositories/calendar_repository.dart';
 import 'data/repositories/settings_repository.dart';
 import 'ui/core/theme.dart';
@@ -12,8 +16,9 @@ import 'ui/features/settings/view_models/theme_view_model.dart';
 /// [WidgetsFlutterBinding.ensureInitialized] must be called before any
 /// native or asynchronous initialization. [runApp] inflates the widget
 /// tree and attaches it to the screen surface.
-void main() async {
+void main(List<String> arguments) async {
   WidgetsFlutterBinding.ensureInitialized();
+  final intentService = CalendarIntentService(executableArguments: arguments);
 
   // Load persisted settings before constructing view models so that the UI
   // starts with the user's last-chosen preferences immediately.
@@ -26,14 +31,15 @@ void main() async {
     repository: calendarRepository,
     settingsRepository: settingsRepository,
   );
-  final themeViewModel = ThemeViewModel(
-    settingsRepository: settingsRepository,
-  );
+  final themeViewModel = ThemeViewModel(settingsRepository: settingsRepository);
 
-  runApp(CalendarApp(
-    viewModel: calendarViewModel,
-    themeViewModel: themeViewModel,
-  ));
+  runApp(
+    CalendarApp(
+      viewModel: calendarViewModel,
+      themeViewModel: themeViewModel,
+      intentService: intentService,
+    ),
+  );
 }
 
 /// Root widget of the application.
@@ -45,10 +51,12 @@ class CalendarApp extends StatelessWidget {
     super.key,
     required this.viewModel,
     required this.themeViewModel,
+    this.intentService,
   });
 
   final CalendarViewModel viewModel;
   final ThemeViewModel themeViewModel;
+  final CalendarIntentService? intentService;
 
   @override
   Widget build(BuildContext context) {
@@ -69,14 +77,24 @@ class CalendarApp extends StatelessWidget {
             );
 
             return MaterialApp(
-              title: 'Calendar',
+              onGenerateTitle: (context) =>
+                  AppLocalizations.of(context)!.appTitle,
               debugShowCheckedModeBanner: false,
               theme: lightTheme,
               darkTheme: darkTheme,
               themeMode: themeViewModel.themeMode,
+              locale: themeViewModel.locale,
+              localizationsDelegates: const [
+                AppLocalizations.delegate,
+                GlobalMaterialLocalizations.delegate,
+                GlobalWidgetsLocalizations.delegate,
+                GlobalCupertinoLocalizations.delegate,
+              ],
+              supportedLocales: AppLocalizations.supportedLocales,
               home: CalendarView(
                 viewModel: viewModel,
                 themeViewModel: themeViewModel,
+                intentService: intentService,
               ),
             );
           },

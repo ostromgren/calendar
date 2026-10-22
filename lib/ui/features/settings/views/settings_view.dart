@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:calendar/domain/models/app_language.dart';
+import 'package:calendar/l10n/generated/app_localizations.dart';
+
+import '../../../core/theme_localization.dart';
 import '../../calendar/view_models/calendar_view_model.dart';
 import '../view_models/theme_view_model.dart';
 import 'theme_selection_view.dart';
@@ -36,31 +40,42 @@ class _SettingsViewState extends State<SettingsView> {
   }
 
   String _formatThemeMode(ThemeMode mode) {
+    final l10n = AppLocalizations.of(context)!;
     switch (mode) {
       case ThemeMode.system:
-        return 'System Mode';
+        return l10n.systemMode;
       case ThemeMode.light:
-        return 'Light Mode';
+        return l10n.lightMode;
       case ThemeMode.dark:
-        return 'Dark Mode';
+        return l10n.darkMode;
     }
   }
+
+  String _languageLabel(AppLanguage language, AppLocalizations l10n) =>
+      switch (language) {
+        AppLanguage.system => l10n.systemLanguage,
+        AppLanguage.english => l10n.englishLanguage,
+        AppLanguage.swedish => l10n.swedishLanguage,
+      };
+
+  String _startingDayLabel(StartingDayOfWeek day, AppLocalizations l10n) =>
+      switch (day) {
+        StartingDayOfWeek.monday => l10n.monday,
+        StartingDayOfWeek.sunday => l10n.sunday,
+        StartingDayOfWeek.saturday => l10n.saturday,
+      };
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final l10n = AppLocalizations.of(context)!;
     final calendarVm = widget.calendarViewModel;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Settings'),
-      ),
+      appBar: AppBar(title: Text(l10n.settings)),
       body: ListenableBuilder(
-        listenable: Listenable.merge([
-          widget.themeViewModel,
-          ?calendarVm,
-        ]),
+        listenable: Listenable.merge([widget.themeViewModel, ?calendarVm]),
         builder: (context, _) {
           final currentTheme = widget.themeViewModel.currentTheme;
           final currentMode = widget.themeViewModel.themeMode;
@@ -71,7 +86,7 @@ class _SettingsViewState extends State<SettingsView> {
           return ListView(
             children: [
               // 1. Appearance Section
-              _buildSectionHeader(context, 'Appearance'),
+              _buildSectionHeader(context, l10n.appearance),
               ListTile(
                 leading: Container(
                   width: 36,
@@ -86,12 +101,12 @@ class _SettingsViewState extends State<SettingsView> {
                     size: 20,
                   ),
                 ),
-                title: const Text(
-                  'Themes',
+                title: Text(
+                  l10n.themes,
                   style: TextStyle(fontWeight: FontWeight.w600),
                 ),
                 subtitle: Text(
-                  '${currentTheme.title} • ${_formatThemeMode(currentMode)}',
+                  '${currentTheme.localizedTitle(l10n)} • ${_formatThemeMode(currentMode)}',
                   style: TextStyle(color: colorScheme.onSurfaceVariant),
                 ),
                 trailing: const Icon(Icons.chevron_right),
@@ -109,7 +124,41 @@ class _SettingsViewState extends State<SettingsView> {
               const Divider(height: 24),
 
               // 2. Calendar Preferences Section
-              _buildSectionHeader(context, 'Calendar Preferences'),
+              _buildSectionHeader(context, l10n.calendarPreferences),
+              ListTile(
+                leading: Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: colorScheme.tertiaryContainer,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.language,
+                    color: colorScheme.onTertiaryContainer,
+                    size: 20,
+                  ),
+                ),
+                title: Text(
+                  l10n.language,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+                trailing: DropdownButton<AppLanguage>(
+                  value: widget.themeViewModel.appLanguage,
+                  underline: const SizedBox.shrink(),
+                  items: AppLanguage.values.map((language) {
+                    return DropdownMenuItem(
+                      value: language,
+                      child: Text(_languageLabel(language, l10n)),
+                    );
+                  }).toList(),
+                  onChanged: (language) {
+                    if (language != null) {
+                      widget.themeViewModel.setAppLanguage(language);
+                    }
+                  },
+                ),
+              ),
               ListTile(
                 leading: Container(
                   width: 36,
@@ -124,18 +173,18 @@ class _SettingsViewState extends State<SettingsView> {
                     size: 20,
                   ),
                 ),
-                title: const Text(
-                  'First Day of Week',
+                title: Text(
+                  l10n.firstDayOfWeek,
                   style: TextStyle(fontWeight: FontWeight.w600),
                 ),
-                subtitle: Text(activeFirstDay.label),
+                subtitle: Text(_startingDayLabel(activeFirstDay, l10n)),
                 trailing: DropdownButton<StartingDayOfWeek>(
                   value: activeFirstDay,
                   underline: const SizedBox.shrink(),
                   items: StartingDayOfWeek.values.map((day) {
                     return DropdownMenuItem(
                       value: day,
-                      child: Text(day.label),
+                      child: Text(_startingDayLabel(day, l10n)),
                     );
                   }).toList(),
                   onChanged: (val) {
@@ -160,11 +209,11 @@ class _SettingsViewState extends State<SettingsView> {
                     size: 20,
                   ),
                 ),
-                title: const Text(
-                  'Show Week Numbers',
+                title: Text(
+                  l10n.showWeekNumbers,
                   style: TextStyle(fontWeight: FontWeight.w600),
                 ),
-                subtitle: const Text('Display week indicators on calendar rows'),
+                subtitle: Text(l10n.weekNumbersDescription),
                 value: activeShowWeekNumbers,
                 onChanged: (val) {
                   setState(() => _showWeekNumbers = val);
@@ -175,7 +224,7 @@ class _SettingsViewState extends State<SettingsView> {
               const Divider(height: 24),
 
               // 3. About Section
-              _buildSectionHeader(context, 'About'),
+              _buildSectionHeader(context, l10n.about),
               ListTile(
                 leading: Container(
                   width: 36,
@@ -190,11 +239,11 @@ class _SettingsViewState extends State<SettingsView> {
                     size: 20,
                   ),
                 ),
-                title: const Text(
-                  'Calendar',
+                title: Text(
+                  l10n.appTitle,
                   style: TextStyle(fontWeight: FontWeight.w600),
                 ),
-                subtitle: const Text('Version 1.0.0 • Material 3 & Dynamic Color'),
+                subtitle: Text(l10n.versionInfo),
               ),
             ],
           );

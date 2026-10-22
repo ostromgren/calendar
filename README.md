@@ -1,6 +1,6 @@
 # Calendar App (Flutter)
 
-A cross-platform Calendar application for Android and iOS built with Flutter and Dart.
+A cross-platform Calendar application built with Flutter and Dart.
 
 ---
 
@@ -10,6 +10,8 @@ A cross-platform Calendar application for Android and iOS built with Flutter and
 | :--- | :--- | :--- | :--- |
 | **Android** | **Android 15** (API 35) & **Android 16** (API 36) | **Android 16** (API 36) | `android/app/build.gradle.kts` |
 | **iOS** | **iOS 26** & **iOS 27** (2026 versioning) | **iOS 27** (Deployment target 26.0+) | `ios/Runner.xcodeproj` / `ios/Podfile` |
+| **macOS** | Flutter desktop | Current macOS | `macos/Runner` |
+| **Windows** | Flutter desktop | Windows 10+ | `windows/runner` |
 
 ---
 
@@ -37,6 +39,19 @@ The app uses Flutter's built-in [`ChangeNotifier`](lib/ui/features/calendar/view
 | Native entry point | `android/.../MainActivity.kt` | `ios/Runner/AppDelegate.swift` |
 | App bundle identifier | `applicationId` in `build.gradle.kts` | `PRODUCT_BUNDLE_IDENTIFIER` in Xcode |
 | Icons & splash assets | `android/app/src/main/res/mipmap-*/` | `ios/Runner/Assets.xcassets` |
+
+### Opening calendar events from other apps
+
+Android advertises support for the standard calendar event insertion intent and
+for opening `.ics` files. iOS and macOS register `.ics` as an alternate file
+type, so the OS can offer Calendar when opening an invite. Incoming invites
+open prefilled in the event form for review before saving.
+
+Windows builds receive `.ics` file paths when launched by the OS. To add the
+app to the Windows **Open with** list, run the bundled
+`register_calendar_association.ps1` from PowerShell after installing the app.
+The script registers the current user's file association without changing the
+default `.ics` application.
 
 ---
 

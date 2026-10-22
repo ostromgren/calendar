@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:calendar/l10n/generated/app_localizations.dart';
+
 import '../../../core/theme.dart';
+import '../../../core/theme_localization.dart';
 import '../view_models/theme_view_model.dart';
 
 /// Screen allowing the user to select their calendar theme and brightness mode.
 ///
 /// Features 5 curated themes plus Android 12+ dynamic system palette support.
 class ThemeSelectionView extends StatelessWidget {
-  const ThemeSelectionView({
-    super.key,
-    required this.themeViewModel,
-  });
+  const ThemeSelectionView({super.key, required this.themeViewModel});
 
   final ThemeViewModel themeViewModel;
 
@@ -22,11 +22,10 @@ class ThemeSelectionView extends StatelessWidget {
         final currentMode = themeViewModel.themeMode;
         final theme = Theme.of(context);
         final colorScheme = theme.colorScheme;
+        final l10n = AppLocalizations.of(context)!;
 
         return Scaffold(
-          appBar: AppBar(
-            title: const Text('Themes'),
-          ),
+          appBar: AppBar(title: Text(l10n.themes)),
           body: ListView(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             children: [
@@ -51,7 +50,7 @@ class ThemeSelectionView extends StatelessWidget {
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            'Live Preview',
+                            l10n.livePreview,
                             style: theme.textTheme.labelLarge?.copyWith(
                               color: colorScheme.primary,
                               fontWeight: FontWeight.bold,
@@ -83,7 +82,7 @@ class ThemeSelectionView extends StatelessWidget {
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 Text(
-                                  'October 2026',
+                                  l10n.themePreviewMonth,
                                   style: theme.textTheme.titleSmall?.copyWith(
                                     fontWeight: FontWeight.bold,
                                   ),
@@ -163,7 +162,7 @@ class ThemeSelectionView extends StatelessWidget {
                                   ),
                                   const SizedBox(width: 8),
                                   Text(
-                                    '10:00 - Team Kickoff Sync',
+                                    l10n.themePreviewEvent,
                                     style: theme.textTheme.bodySmall?.copyWith(
                                       color: colorScheme.onPrimaryContainer,
                                       fontWeight: FontWeight.w600,
@@ -184,7 +183,7 @@ class ThemeSelectionView extends StatelessWidget {
 
               // 2. Brightness Mode Section
               Text(
-                'Brightness',
+                l10n.brightness,
                 style: theme.textTheme.titleSmall?.copyWith(
                   fontWeight: FontWeight.bold,
                   color: colorScheme.primary,
@@ -192,21 +191,21 @@ class ThemeSelectionView extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               SegmentedButton<ThemeMode>(
-                segments: const [
+                segments: [
                   ButtonSegment<ThemeMode>(
                     value: ThemeMode.system,
                     icon: Icon(Icons.brightness_auto),
-                    label: Text('System'),
+                    label: Text(l10n.systemBrightness),
                   ),
                   ButtonSegment<ThemeMode>(
                     value: ThemeMode.light,
                     icon: Icon(Icons.light_mode),
-                    label: Text('Light'),
+                    label: Text(l10n.light),
                   ),
                   ButtonSegment<ThemeMode>(
                     value: ThemeMode.dark,
                     icon: Icon(Icons.dark_mode),
-                    label: Text('Dark'),
+                    label: Text(l10n.dark),
                   ),
                 ],
                 selected: {currentMode},
@@ -230,7 +229,7 @@ class ThemeSelectionView extends StatelessWidget {
                   children: [
                     // Dynamic System Theme Header
                     Text(
-                      'Dynamic System Theme',
+                      l10n.dynamicSystemTheme,
                       style: theme.textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.bold,
                         color: colorScheme.primary,
@@ -238,7 +237,7 @@ class ThemeSelectionView extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Special theme for Android (and supported systems) matching your wallpaper and chosen Color Palette.',
+                      l10n.dynamicThemeDescription,
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: colorScheme.onSurfaceVariant,
                       ),
@@ -255,16 +254,16 @@ class ThemeSelectionView extends StatelessWidget {
 
                     // Curated App Themes Header
                     Text(
-                      'Curated Color Themes',
+                      l10n.curatedColorThemes,
                       style: theme.textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.bold,
                         color: colorScheme.primary,
                       ),
                     ),
                     const SizedBox(height: 8),
-                    ...AppThemeType.values
-                        .where((t) => !t.isDynamic)
-                        .map((themeOption) {
+                    ...AppThemeType.values.where((t) => !t.isDynamic).map((
+                      themeOption,
+                    ) {
                       return _CuratedThemeTile(
                         themeType: themeOption,
                         isSelected: currentTheme == themeOption,
@@ -316,8 +315,9 @@ class ThemeSelectionView extends StatelessWidget {
         label,
         style: theme.textTheme.bodySmall?.copyWith(
           color: fg,
-          fontWeight:
-              isSelected || isToday ? FontWeight.bold : FontWeight.normal,
+          fontWeight: isSelected || isToday
+              ? FontWeight.bold
+              : FontWeight.normal,
         ),
       ),
     );
@@ -340,6 +340,7 @@ class _DynamicThemeCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final l10n = AppLocalizations.of(context)!;
 
     return Card(
       elevation: isSelected ? 1 : 0,
@@ -366,10 +367,7 @@ class _DynamicThemeCard extends StatelessWidget {
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       gradient: LinearGradient(
-                        colors: [
-                          colorScheme.primary,
-                          colorScheme.tertiary,
-                        ],
+                        colors: [colorScheme.primary, colorScheme.tertiary],
                       ),
                     ),
                     child: Icon(
@@ -389,7 +387,7 @@ class _DynamicThemeCard extends StatelessWidget {
                           runSpacing: 4,
                           children: [
                             Text(
-                              themeType.title,
+                              themeType.localizedTitle(l10n),
                               style: theme.textTheme.titleMedium?.copyWith(
                                 fontWeight: FontWeight.bold,
                               ),
@@ -404,7 +402,7 @@ class _DynamicThemeCard extends StatelessWidget {
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: Text(
-                                'Android Material You',
+                                l10n.androidMaterialYou,
                                 style: theme.textTheme.labelSmall?.copyWith(
                                   color: colorScheme.onSecondaryContainer,
                                   fontWeight: FontWeight.w600,
@@ -415,7 +413,7 @@ class _DynamicThemeCard extends StatelessWidget {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          themeType.subtitle,
+                          themeType.localizedSubtitle(l10n),
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: colorScheme.onSurfaceVariant,
                           ),
@@ -423,9 +421,7 @@ class _DynamicThemeCard extends StatelessWidget {
                       ],
                     ),
                   ),
-                  Radio<AppThemeType>(
-                    value: themeType,
-                  ),
+                  Radio<AppThemeType>(value: themeType),
                 ],
               ),
               const SizedBox(height: 10),
@@ -448,7 +444,7 @@ class _DynamicThemeCard extends StatelessWidget {
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
-                        'On Android 12+, colors dynamically match your wallpaper palette choice. On other platforms, uses modern default tones.',
+                        l10n.dynamicColorInfo,
                         style: theme.textTheme.bodySmall?.copyWith(
                           fontSize: 11,
                           color: colorScheme.onSurfaceVariant,
@@ -482,6 +478,7 @@ class _CuratedThemeTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final l10n = AppLocalizations.of(context)!;
 
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 4),
@@ -502,10 +499,7 @@ class _CuratedThemeTile extends StatelessWidget {
           decoration: BoxDecoration(
             color: themeType.seedColor,
             shape: BoxShape.circle,
-            border: Border.all(
-              color: Colors.white.withAlpha(80),
-              width: 1.5,
-            ),
+            border: Border.all(color: Colors.white.withAlpha(80), width: 1.5),
             boxShadow: [
               BoxShadow(
                 color: themeType.seedColor.withAlpha(80),
@@ -514,27 +508,21 @@ class _CuratedThemeTile extends StatelessWidget {
               ),
             ],
           ),
-          child: Icon(
-            themeType.icon,
-            color: Colors.white,
-            size: 20,
-          ),
+          child: Icon(themeType.icon, color: Colors.white, size: 20),
         ),
         title: Text(
-          themeType.title,
+          themeType.localizedTitle(l10n),
           style: theme.textTheme.titleMedium?.copyWith(
             fontWeight: FontWeight.w600,
           ),
         ),
         subtitle: Text(
-          themeType.subtitle,
+          themeType.localizedSubtitle(l10n),
           style: theme.textTheme.bodySmall?.copyWith(
             color: colorScheme.onSurfaceVariant,
           ),
         ),
-        trailing: Radio<AppThemeType>(
-          value: themeType,
-        ),
+        trailing: Radio<AppThemeType>(value: themeType),
       ),
     );
   }

@@ -10,6 +10,8 @@ class CalendarEvent {
     required this.title,
     required this.startTime,
     required this.endTime,
+    this.isAllDay = false,
+    this.calendarId = 'personal',
     this.description = '',
     this.color = Colors.blue,
   });
@@ -17,8 +19,10 @@ class CalendarEvent {
   final String id;
   final String title;
   final String description;
+  final String calendarId;
   final DateTime startTime;
   final DateTime endTime;
+  final bool isAllDay;
   final Color color;
 
   /// Returns true if this event falls on the specified [date] (ignoring time-of-day).
@@ -33,16 +37,20 @@ class CalendarEvent {
     String? id,
     String? title,
     String? description,
+    String? calendarId,
     DateTime? startTime,
     DateTime? endTime,
+    bool? isAllDay,
     Color? color,
   }) {
     return CalendarEvent(
       id: id ?? this.id,
       title: title ?? this.title,
       description: description ?? this.description,
+      calendarId: calendarId ?? this.calendarId,
       startTime: startTime ?? this.startTime,
       endTime: endTime ?? this.endTime,
+      isAllDay: isAllDay ?? this.isAllDay,
       color: color ?? this.color,
     );
   }

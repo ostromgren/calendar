@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:calendar/domain/models/app_language.dart';
+import 'package:calendar/domain/models/local_calendar.dart';
 import 'package:calendar/domain/models/starting_day_of_week.dart';
 import 'package:calendar/ui/core/theme.dart';
 
@@ -9,6 +11,8 @@ abstract final class _Keys {
   static const String themeMode = 'settings.theme_mode';
   static const String firstDayOfWeek = 'settings.first_day_of_week';
   static const String showWeekNumbers = 'settings.show_week_numbers';
+  static const String lastUsedCalendarId = 'settings.last_used_calendar_id';
+  static const String appLanguage = 'settings.app_language';
 }
 
 /// Persists and retrieves user settings using [SharedPreferences].
@@ -98,4 +102,37 @@ class SettingsRepository {
   /// Persists [value] as the week-number visibility preference.
   Future<void> saveShowWeekNumbers(bool value) =>
       _prefs.setBool(_Keys.showWeekNumbers, value);
+
+  // ---------------------------------------------------------------------------
+  // Last-used calendar
+  // ---------------------------------------------------------------------------
+
+  /// Returns the last-used local calendar, defaulting to Personal.
+  LocalCalendar get lastUsedCalendar {
+    final stored = _prefs.getString(_Keys.lastUsedCalendarId);
+    return stored == null
+        ? LocalCalendar.personal
+        : LocalCalendar.fromId(stored);
+  }
+
+  /// Persists the calendar used for the most recently saved event.
+  Future<void> saveLastUsedCalendar(LocalCalendar calendar) =>
+      _prefs.setString(_Keys.lastUsedCalendarId, calendar.id);
+
+  // ---------------------------------------------------------------------------
+  // App language
+  // ---------------------------------------------------------------------------
+
+  /// Returns the selected interface language, defaulting to the system language.
+  AppLanguage get appLanguage {
+    final stored = _prefs.getString(_Keys.appLanguage);
+    return AppLanguage.values.firstWhere(
+      (language) => language.name == stored,
+      orElse: () => AppLanguage.system,
+    );
+  }
+
+  /// Persists the selected interface language.
+  Future<void> saveAppLanguage(AppLanguage language) =>
+      _prefs.setString(_Keys.appLanguage, language.name);
 }
