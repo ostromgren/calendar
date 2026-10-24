@@ -2,6 +2,8 @@
   "@@locale": "sv",
   "appTitle": "Kalender",
   "myCalendar": "Min kalender",
+  "agendaView": "Visa agendavy",
+  "calendarView": "Visa kalendervy",
   "settings": "Inställningar",
   "newEvent": "Ny händelse",
   "today": "Idag",
