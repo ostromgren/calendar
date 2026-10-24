@@ -339,6 +339,8 @@ class _CalendarViewState extends State<CalendarView>
           selectedDate:
               initialEvent?.startTime ?? widget.viewModel.selectedDate,
           initialCalendar: widget.viewModel.lastUsedCalendar,
+          initialCalendarDestination:
+              widget.viewModel.lastUsedCalendarDestination,
           deviceCalendars: deviceCalendars,
           initialEvent: initialEvent,
           onSave:
@@ -373,6 +375,9 @@ class _CalendarViewState extends State<CalendarView>
                     start: startTime,
                     end: endTime,
                     isAllDay: isAllDay,
+                  );
+                  await widget.viewModel.rememberDeviceCalendar(
+                    deviceCalendarId,
                   );
                 }
               },
@@ -445,10 +450,13 @@ class _CalendarViewState extends State<CalendarView>
 
         return Scaffold(
           appBar: AppBar(
-            title: Text(
-              calendarGreeting(l10n, now),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+            title: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                calendarGreeting(l10n, now),
+                maxLines: 1,
+                softWrap: false,
+              ),
             ),
             centerTitle: true,
             leading: IconButton(
@@ -765,6 +773,7 @@ class _AddEventBottomSheet extends StatefulWidget {
   const _AddEventBottomSheet({
     required this.selectedDate,
     required this.initialCalendar,
+    required this.initialCalendarDestination,
     required this.deviceCalendars,
     this.initialEvent,
     required this.onSave,
@@ -772,6 +781,7 @@ class _AddEventBottomSheet extends StatefulWidget {
 
   final DateTime selectedDate;
   final LocalCalendar initialCalendar;
+  final String initialCalendarDestination;
   final List<DeviceCalendarInfo> deviceCalendars;
   final ExternalCalendarEvent? initialEvent;
   final Future<void> Function({
@@ -811,7 +821,16 @@ class _AddEventBottomSheetState extends State<_AddEventBottomSheet> {
       text: widget.initialEvent?.description ?? '',
     );
     _titleFocusNode = FocusNode();
-    _selectedCalendarId = 'local:${widget.initialCalendar.id}';
+    final destination = widget.initialCalendarDestination;
+    final hasAvailableDeviceCalendar =
+        destination.startsWith('device:') &&
+        widget.deviceCalendars.any(
+          (calendar) =>
+              destination == 'device:${calendar.id}' && !calendar.readOnly,
+        );
+    _selectedCalendarId = hasAvailableDeviceCalendar
+        ? destination
+        : 'local:${widget.initialCalendar.id}';
     _isAllDay = widget.initialEvent?.isAllDay ?? false;
     if (widget.initialEvent != null && !_isAllDay) {
       _startTime = TimeOfDay.fromDateTime(widget.initialEvent!.startTime);

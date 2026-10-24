@@ -54,6 +54,14 @@ class CalendarViewModel extends ChangeNotifier {
   /// Calendar selected by default when adding the next event.
   LocalCalendar get lastUsedCalendar => _lastUsedCalendar;
 
+  /// Destination selected by default when adding the next event.
+  String get lastUsedCalendarDestination =>
+      _settings.lastUsedCalendarDestination;
+
+  /// Remembers a device calendar as the destination for the next event.
+  Future<void> rememberDeviceCalendar(String calendarId) =>
+      _settings.saveLastUsedCalendarDestination('device:$calendarId');
+
   /// Updates the starting day of the week and notifies observing widgets.
   void setFirstDayOfWeek(StartingDayOfWeek day) {
     if (_firstDayOfWeek != day) {

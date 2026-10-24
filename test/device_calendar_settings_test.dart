@@ -191,5 +191,16 @@ void main() {
 
     expect(repository.createdCalendarId, 'google-work');
     expect(find.text('Add Event'), findsNothing);
+
+    await tester.tap(find.text('New Event'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Work • person.with.a.very.long.email.address@example.com'),
+      findsOneWidget,
+    );
+    expect(
+      (await SettingsRepository.load()).lastUsedCalendarDestination,
+      'device:google-work',
+    );
   });
 }

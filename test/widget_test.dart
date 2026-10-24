@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:calendar/data/repositories/calendar_repository.dart';
 import 'package:calendar/data/repositories/settings_repository.dart';
+import 'package:calendar/domain/models/app_language.dart';
 import 'package:calendar/l10n/generated/app_localizations.dart';
 import 'package:calendar/main.dart';
 import 'package:calendar/ui/features/calendar/calendar_greeting.dart';
@@ -102,6 +103,38 @@ void main() {
       scrollable: find.byType(Scrollable).first,
     );
     expect(find.text('Test Meeting'), findsOneWidget);
+  });
+
+  testWidgets('long Swedish greeting scales to fit in the app bar', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(360, 800);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    SharedPreferences.setMockInitialValues({});
+    final settings = await SettingsRepository.load();
+    await settings.saveAppLanguage(AppLanguage.swedish);
+    final viewModel = CalendarViewModel(
+      repository: CalendarRepository(),
+      settingsRepository: settings,
+    );
+    final themeViewModel = ThemeViewModel(settingsRepository: settings);
+
+    await tester.pumpWidget(
+      CalendarApp(viewModel: viewModel, themeViewModel: themeViewModel),
+    );
+    await tester.pumpAndSettle();
+
+    final l10n = AppLocalizations.of(tester.element(find.byType(AppBar)))!;
+    final greetingFinder = find.text(calendarGreeting(l10n, DateTime.now()));
+    expect(greetingFinder, findsOneWidget);
+    expect(
+      find.ancestor(of: greetingFinder, matching: find.byType(FittedBox)),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets(

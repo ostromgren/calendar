@@ -12,6 +12,8 @@ abstract final class _Keys {
   static const String firstDayOfWeek = 'settings.first_day_of_week';
   static const String showWeekNumbers = 'settings.show_week_numbers';
   static const String lastUsedCalendarId = 'settings.last_used_calendar_id';
+  static const String lastUsedCalendarDestination =
+      'settings.last_used_calendar_destination';
   static const String appLanguage = 'settings.app_language';
   static const String deviceCalendarIds = 'settings.device_calendar_ids';
 }
@@ -116,9 +118,20 @@ class SettingsRepository {
         : LocalCalendar.fromId(stored);
   }
 
-  /// Persists the calendar used for the most recently saved event.
-  Future<void> saveLastUsedCalendar(LocalCalendar calendar) =>
-      _prefs.setString(_Keys.lastUsedCalendarId, calendar.id);
+  /// The last event destination, or the legacy local-calendar preference.
+  String get lastUsedCalendarDestination =>
+      _prefs.getString(_Keys.lastUsedCalendarDestination) ??
+      'local:${lastUsedCalendar.id}';
+
+  /// Persists the destination used for the most recently saved event.
+  Future<void> saveLastUsedCalendarDestination(String destination) =>
+      _prefs.setString(_Keys.lastUsedCalendarDestination, destination);
+
+  /// Persists the local calendar used for the most recently saved event.
+  Future<void> saveLastUsedCalendar(LocalCalendar calendar) async {
+    await _prefs.setString(_Keys.lastUsedCalendarId, calendar.id);
+    await saveLastUsedCalendarDestination('local:${calendar.id}');
+  }
 
   // ---------------------------------------------------------------------------
   // App language
