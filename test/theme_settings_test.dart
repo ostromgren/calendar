@@ -5,7 +5,9 @@ import 'package:intl/intl.dart';
 import 'package:calendar/data/repositories/calendar_repository.dart';
 import 'package:calendar/data/repositories/settings_repository.dart';
 import 'package:calendar/domain/models/app_language.dart';
+import 'package:calendar/l10n/generated/app_localizations.dart';
 import 'package:calendar/main.dart';
+import 'package:calendar/ui/features/calendar/calendar_greeting.dart';
 import 'package:calendar/ui/core/theme.dart';
 import 'package:calendar/ui/features/calendar/view_models/calendar_view_model.dart';
 import 'package:calendar/ui/features/settings/view_models/theme_view_model.dart';
@@ -94,7 +96,15 @@ void main() {
 
         Navigator.of(tester.element(find.byType(SettingsView))).pop();
         await tester.pumpAndSettle();
-        expect(find.text('Min kalender'), findsOneWidget);
+        expect(
+          find.text(
+            calendarGreeting(
+              AppLocalizations.of(tester.element(find.byType(AppBar)))!,
+              DateTime.now(),
+            ),
+          ),
+          findsOneWidget,
+        );
         expect(
           find.text(
             DateFormat(
@@ -118,7 +128,15 @@ void main() {
         Navigator.of(tester.element(find.byType(SettingsView))).pop();
         await tester.pumpAndSettle();
 
-        expect(find.text('My Calendar'), findsOneWidget);
+        expect(
+          find.text(
+            calendarGreeting(
+              AppLocalizations.of(tester.element(find.byType(AppBar)))!,
+              DateTime.now(),
+            ),
+          ),
+          findsOneWidget,
+        );
         expect(settingsRepository.appLanguage, AppLanguage.system);
       },
     );

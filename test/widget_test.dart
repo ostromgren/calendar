@@ -5,7 +5,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:calendar/data/repositories/calendar_repository.dart';
 import 'package:calendar/data/repositories/settings_repository.dart';
+import 'package:calendar/l10n/generated/app_localizations.dart';
 import 'package:calendar/main.dart';
+import 'package:calendar/ui/features/calendar/calendar_greeting.dart';
 import 'package:calendar/ui/features/calendar/view_models/calendar_view_model.dart';
 import 'package:calendar/ui/features/settings/view_models/theme_view_model.dart';
 
@@ -32,8 +34,9 @@ void main() {
     await tester.pumpAndSettle();
     await tester.pumpAndSettle();
 
-    // Verify AppBar title is displayed
-    expect(find.text('My Calendar'), findsOneWidget);
+    // Verify the time-based AppBar greeting is displayed.
+    final l10n = AppLocalizations.of(tester.element(find.byType(AppBar)))!;
+    expect(find.text(calendarGreeting(l10n, DateTime.now())), findsOneWidget);
 
     // Verify weekday headers are displayed
     expect(find.text('Mon'), findsOneWidget);

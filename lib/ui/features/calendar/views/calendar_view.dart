@@ -10,6 +10,7 @@ import '../../settings/view_models/theme_view_model.dart';
 import '../../settings/view_models/device_calendars_view_model.dart';
 import '../../settings/views/settings_view.dart';
 import '../../../../domain/models/local_calendar.dart';
+import '../calendar_greeting.dart';
 import '../view_models/calendar_view_model.dart';
 import 'widgets/day_cell.dart';
 import 'widgets/event_tile.dart';
@@ -84,6 +85,7 @@ class _CalendarViewState extends State<CalendarView>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
+      setState(() {});
       _loadDeviceCalendars();
     }
   }
@@ -443,7 +445,11 @@ class _CalendarViewState extends State<CalendarView>
 
         return Scaffold(
           appBar: AppBar(
-            title: Text(l10n.myCalendar),
+            title: Text(
+              calendarGreeting(l10n, now),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
             centerTitle: true,
             leading: IconButton(
               icon: Icon(
@@ -478,246 +484,271 @@ class _CalendarViewState extends State<CalendarView>
             icon: const Icon(Icons.add),
             label: Text(l10n.newEvent),
           ),
-          body: GestureDetector(
-            behavior: HitTestBehavior.translucent,
-            onHorizontalDragStart: _onHorizontalDragStart,
-            onHorizontalDragUpdate: _onHorizontalDragUpdate,
-            onHorizontalDragEnd: _onHorizontalDragEnd,
-            onHorizontalDragCancel: _onHorizontalDragCancel,
-            child: CustomScrollView(
-              slivers: [
-                // 1. Month Header (Previous / Next / Today)
-                SliverToBoxAdapter(
-                  child: MonthHeader(
-                    focusedMonth: focusedMonth,
-                    onPreviousMonth: widget.viewModel.previousMonth,
-                    onNextMonth: widget.viewModel.nextMonth,
-                    onToday: widget.viewModel.goToToday,
+          body: LayoutBuilder(
+            builder: (context, constraints) {
+              final horizontalPadding = constraints.maxWidth >= 600
+                  ? 24.0
+                  : 0.0;
+              return GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onHorizontalDragStart: _onHorizontalDragStart,
+                onHorizontalDragUpdate: _onHorizontalDragUpdate,
+                onHorizontalDragEnd: _onHorizontalDragEnd,
+                onHorizontalDragCancel: _onHorizontalDragCancel,
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+                  child: CustomScrollView(
+                    slivers: [
+                      // 1. Month Header (Previous / Next / Today)
+                      SliverToBoxAdapter(
+                        child: MonthHeader(
+                          focusedMonth: focusedMonth,
+                          onPreviousMonth: widget.viewModel.previousMonth,
+                          onNextMonth: widget.viewModel.nextMonth,
+                          onToday: widget.viewModel.goToToday,
+                        ),
+                      ),
+
+                      if (!_isAgendaView) ...[
+                        // 2. Weekday Header Row
+                        SliverToBoxAdapter(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10.0,
+                            ),
+                            child: Row(
+                              children: [
+                                if (showWeekNumbers)
+                                  Expanded(
+                                    child: Center(
+                                      child: Text(
+                                        l10n.weekNumberShort,
+                                        style: theme.textTheme.bodySmall
+                                            ?.copyWith(
+                                              fontWeight: FontWeight.bold,
+                                              color: theme.colorScheme.outline,
+                                              fontSize: 11,
+                                            ),
+                                      ),
+                                    ),
+                                  ),
+                                ...weekdayHeaders.map((day) {
+                                  return Expanded(
+                                    child: Center(
+                                      child: Text(
+                                        day,
+                                        style: theme.textTheme.bodySmall
+                                            ?.copyWith(
+                                              fontWeight: FontWeight.bold,
+                                              color: theme
+                                                  .colorScheme
+                                                  .onSurfaceVariant,
+                                            ),
+                                      ),
+                                    ),
+                                  );
+                                }),
+                              ],
+                            ),
+                          ),
+                        ),
+
+                        const SliverToBoxAdapter(child: SizedBox(height: 6)),
+
+                        // 3. Calendar Grid (7 columns, or 8 with week numbers)
+                        SliverPadding(
+                          padding: const EdgeInsets.symmetric(horizontal: 10.0),
+                          sliver: SliverGrid(
+                            gridDelegate:
+                                SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: showWeekNumbers ? 8 : 7,
+                                  childAspectRatio: showWeekNumbers
+                                      ? 1.05
+                                      : 1.2,
+                                ),
+                            delegate: SliverChildBuilderDelegate(
+                              (context, index) {
+                                if (showWeekNumbers) {
+                                  final row = index ~/ 8;
+                                  final col = index % 8;
+
+                                  if (col == 0) {
+                                    final thursdayOffset =
+                                        firstDay == StartingDayOfWeek.sunday
+                                        ? 4
+                                        : (firstDay ==
+                                                  StartingDayOfWeek.saturday
+                                              ? 5
+                                              : 3);
+                                    final weekNumber = _getIsoWeekNumber(
+                                      gridDays[row * 7 + thursdayOffset],
+                                    );
+                                    return WeekNumberCell(
+                                      weekNumber: weekNumber,
+                                      tooltipBuilder: l10n.weekTooltip,
+                                    );
+                                  }
+
+                                  final dayIndex = row * 7 + (col - 1);
+                                  final date = gridDays[dayIndex];
+                                  return _buildDayCell(
+                                    date,
+                                    focusedMonth,
+                                    selectedDate,
+                                    today,
+                                  );
+                                }
+
+                                final date = gridDays[index];
+                                return _buildDayCell(
+                                  date,
+                                  focusedMonth,
+                                  selectedDate,
+                                  today,
+                                );
+                              },
+                              childCount: showWeekNumbers
+                                  ? (gridDays.length ~/ 7) * 8
+                                  : gridDays.length,
+                            ),
+                          ),
+                        ),
+
+                        const SliverToBoxAdapter(child: Divider(height: 16)),
+
+                        // 4. Selected Date Summary Header
+                        SliverToBoxAdapter(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16.0,
+                              vertical: 4.0,
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    DateFormat(
+                                      'EEEE, MMM d',
+                                      locale,
+                                    ).format(selectedDate),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: theme.textTheme.titleMedium
+                                        ?.copyWith(fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                                Text(
+                                  l10n.eventCount(events.length),
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: theme.colorScheme.primary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+
+                        // 5. Daily Events List or Empty State
+                        if (events.isEmpty)
+                          SliverToBoxAdapter(
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 24.0,
+                              ),
+                              child: Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.event_available,
+                                      size: 40,
+                                      color: theme.colorScheme.outlineVariant,
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      l10n.noEventsScheduled,
+                                      style: theme.textTheme.bodyMedium
+                                          ?.copyWith(
+                                            color: theme.colorScheme.outline,
+                                          ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          )
+                        else
+                          SliverList.builder(
+                            itemCount: events.length,
+                            itemBuilder: (context, index) {
+                              final event = events[index];
+                              return EventTile(
+                                event: event,
+                                onDelete: () => _deleteEvent(event),
+                              );
+                            },
+                          ),
+                      ] else if (agendaEvents.isEmpty)
+                        SliverToBoxAdapter(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 24.0),
+                            child: Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.event_available,
+                                    size: 40,
+                                    color: theme.colorScheme.outlineVariant,
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    l10n.noEventsScheduled,
+                                    style: theme.textTheme.bodyMedium?.copyWith(
+                                      color: theme.colorScheme.outline,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        )
+                      else
+                        for (final entry in agendaEvents.entries) ...[
+                          SliverToBoxAdapter(
+                            child: Padding(
+                              padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+                              child: Text(
+                                DateFormat(
+                                  'EEEE, MMM d',
+                                  locale,
+                                ).format(entry.key),
+                                style: theme.textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
+                          SliverList.builder(
+                            itemCount: entry.value.length,
+                            itemBuilder: (context, index) {
+                              final event = entry.value[index];
+                              return EventTile(
+                                event: event,
+                                onDelete: () => _deleteEvent(event),
+                              );
+                            },
+                          ),
+                        ],
+
+                      // Bottom padding so content is never obscured by the FloatingActionButton
+                      const SliverToBoxAdapter(child: SizedBox(height: 80)),
+                    ],
                   ),
                 ),
-
-                if (!_isAgendaView) ...[
-                  // 2. Weekday Header Row
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 10.0),
-                      child: Row(
-                        children: [
-                          if (showWeekNumbers)
-                            Expanded(
-                              child: Center(
-                                child: Text(
-                                  l10n.weekNumberShort,
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                    color: theme.colorScheme.outline,
-                                    fontSize: 11,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ...weekdayHeaders.map((day) {
-                            return Expanded(
-                              child: Center(
-                                child: Text(
-                                  day,
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                    color: theme.colorScheme.onSurfaceVariant,
-                                  ),
-                                ),
-                              ),
-                            );
-                          }),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  const SliverToBoxAdapter(child: SizedBox(height: 6)),
-
-                  // 3. Calendar Grid (7 columns, or 8 with week numbers)
-                  SliverPadding(
-                    padding: const EdgeInsets.symmetric(horizontal: 10.0),
-                    sliver: SliverGrid(
-                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: showWeekNumbers ? 8 : 7,
-                        childAspectRatio: showWeekNumbers ? 1.05 : 1.2,
-                      ),
-                      delegate: SliverChildBuilderDelegate(
-                        (context, index) {
-                          if (showWeekNumbers) {
-                            final row = index ~/ 8;
-                            final col = index % 8;
-
-                            if (col == 0) {
-                              final thursdayOffset =
-                                  firstDay == StartingDayOfWeek.sunday
-                                  ? 4
-                                  : (firstDay == StartingDayOfWeek.saturday
-                                        ? 5
-                                        : 3);
-                              final weekNumber = _getIsoWeekNumber(
-                                gridDays[row * 7 + thursdayOffset],
-                              );
-                              return WeekNumberCell(
-                                weekNumber: weekNumber,
-                                tooltipBuilder: l10n.weekTooltip,
-                              );
-                            }
-
-                            final dayIndex = row * 7 + (col - 1);
-                            final date = gridDays[dayIndex];
-                            return _buildDayCell(
-                              date,
-                              focusedMonth,
-                              selectedDate,
-                              today,
-                            );
-                          }
-
-                          final date = gridDays[index];
-                          return _buildDayCell(
-                            date,
-                            focusedMonth,
-                            selectedDate,
-                            today,
-                          );
-                        },
-                        childCount: showWeekNumbers
-                            ? (gridDays.length ~/ 7) * 8
-                            : gridDays.length,
-                      ),
-                    ),
-                  ),
-
-                  const SliverToBoxAdapter(child: Divider(height: 16)),
-
-                  // 4. Selected Date Summary Header
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16.0,
-                        vertical: 4.0,
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Expanded(
-                            child: Text(
-                              DateFormat(
-                                'EEEE, MMM d',
-                                locale,
-                              ).format(selectedDate),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                          Text(
-                            l10n.eventCount(events.length),
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.primary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  // 5. Daily Events List or Empty State
-                  if (events.isEmpty)
-                    SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 24.0),
-                        child: Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.event_available,
-                                size: 40,
-                                color: theme.colorScheme.outlineVariant,
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                l10n.noEventsScheduled,
-                                style: theme.textTheme.bodyMedium?.copyWith(
-                                  color: theme.colorScheme.outline,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    )
-                  else
-                    SliverList.builder(
-                      itemCount: events.length,
-                      itemBuilder: (context, index) {
-                        final event = events[index];
-                        return EventTile(
-                          event: event,
-                          onDelete: () => _deleteEvent(event),
-                        );
-                      },
-                    ),
-                ] else if (agendaEvents.isEmpty)
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 24.0),
-                      child: Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.event_available,
-                              size: 40,
-                              color: theme.colorScheme.outlineVariant,
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              l10n.noEventsScheduled,
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                color: theme.colorScheme.outline,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  )
-                else
-                  for (final entry in agendaEvents.entries) ...[
-                    SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-                        child: Text(
-                          DateFormat('EEEE, MMM d', locale).format(entry.key),
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                    SliverList.builder(
-                      itemCount: entry.value.length,
-                      itemBuilder: (context, index) {
-                        final event = entry.value[index];
-                        return EventTile(
-                          event: event,
-                          onDelete: () => _deleteEvent(event),
-                        );
-                      },
-                    ),
-                  ],
-
-                // Bottom padding so content is never obscured by the FloatingActionButton
-                const SliverToBoxAdapter(child: SizedBox(height: 80)),
-              ],
-            ),
+              );
+            },
           ),
         );
       },
