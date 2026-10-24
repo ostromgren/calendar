@@ -16,6 +16,7 @@
   "descriptionOptional": "Beskrivning (valfri)",
   "saveToCalendar": "Spara i kalender",
   "savedLocallyOnDevice": "Sparas lokalt på den här enheten",
+  "savedToDeviceCalendar": "Sparas i den valda synkroniserade kalendern",
   "personalCalendar": "Personligt",
   "startTime": "Start: {time}",
   "endTime": "Slut: {time}",
@@ -24,12 +25,41 @@
   "invalidCalendarFile": "Inga kalenderhändelser hittades i den valda filen.",
   "calendarFileReadError": "Det gick inte att läsa den valda kalenderfilen: {error}",
   "deleteEvent": "Ta bort händelse",
+  "deleteSyncedEventTitle": "Ta bort synkroniserad händelse?",
+  "deleteSyncedEventConfirmation": "Händelsen tas bort från den valda kalendern och kan även tas bort från det synkroniserade kontot.",
+  "cancel": "Avbryt",
+  "calendarWriteError": "Det gick inte att spara eller ta bort kalenderhändelsen: {error}",
+  "@calendarWriteError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "appearance": "Utseende",
   "themes": "Teman",
   "systemMode": "Systemläge",
   "lightMode": "Ljust läge",
   "darkMode": "Mörkt läge",
   "calendarPreferences": "Kalenderinställningar",
+  "accounts": "Konton",
+  "deviceCalendars": "Enhetskalendrar",
+  "deviceCalendarsDescription": "Visa kalendrar som synkroniseras på enheten",
+  "deviceCalendarAccessExplanation": "Google-konton och andra konton som lagts till i enhetens inställningar visas här när kalendersynkronisering är aktiverad. Appen läser kalendrar som redan finns på enheten och loggar inte in direkt hos Google.",
+  "deviceCalendarsUnavailable": "Enhetskalendrar är tillgängliga på Android och iOS.",
+  "allowCalendarAccess": "Tillåt kalenderåtkomst",
+  "openCalendarSettings": "Öppna appens behörighetsinställningar",
+  "deviceAccount": "På den här enheten",
+  "noDeviceCalendars": "Inga kalendrar hittades. Lägg till ett konto i enhetens inställningar och kontrollera att kalendersynkronisering är aktiverad.",
+  "refreshCalendars": "Uppdatera kalendrar",
+  "calendarLoadError": "Det gick inte att läsa in kalendrar: {error}",
+  "@calendarLoadError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "language": "Språk",
   "systemLanguage": "System",
   "englishLanguage": "Engelska",

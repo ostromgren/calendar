@@ -31,6 +31,7 @@
   "descriptionOptional": "Description (optional)",
   "saveToCalendar": "Save to calendar",
   "savedLocallyOnDevice": "Saved locally on this device",
+  "savedToDeviceCalendar": "Saved to the selected synced calendar",
   "personalCalendar": "Personal",
   "startTime": "Start: {time}",
   "@startTime": {
@@ -60,12 +61,41 @@
     }
   },
   "deleteEvent": "Delete event",
+  "deleteSyncedEventTitle": "Delete synced event?",
+  "deleteSyncedEventConfirmation": "This event will be removed from the selected calendar and may also be deleted from its synced account.",
+  "cancel": "Cancel",
+  "calendarWriteError": "Couldn't save or delete the calendar event: {error}",
+  "@calendarWriteError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "appearance": "Appearance",
   "themes": "Themes",
   "systemMode": "System Mode",
   "lightMode": "Light Mode",
   "darkMode": "Dark Mode",
   "calendarPreferences": "Calendar Preferences",
+  "accounts": "Accounts",
+  "deviceCalendars": "Device calendars",
+  "deviceCalendarsDescription": "View calendars synced on this device",
+  "deviceCalendarAccessExplanation": "Google and other accounts added in your device settings appear here when calendar sync is enabled. This app reads calendars already on your device; it does not sign in to Google directly.",
+  "deviceCalendarsUnavailable": "Device calendars are available on Android and iOS.",
+  "allowCalendarAccess": "Allow calendar access",
+  "openCalendarSettings": "Open app permission settings",
+  "deviceAccount": "On this device",
+  "noDeviceCalendars": "No calendars were found. Add an account in your device settings and make sure calendar sync is enabled.",
+  "refreshCalendars": "Refresh calendars",
+  "calendarLoadError": "Couldn't load calendars: {error}",
+  "@calendarLoadError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "language": "Language",
   "systemLanguage": "System",
   "englishLanguage": "English",

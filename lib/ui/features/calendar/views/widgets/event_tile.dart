@@ -52,11 +52,13 @@ class EventTile extends StatelessWidget {
             ],
           ],
         ),
-        trailing: IconButton(
-          icon: const Icon(Icons.delete_outline, size: 20),
-          tooltip: l10n.deleteEvent,
-          onPressed: onDelete,
-        ),
+        trailing: event.readOnly
+            ? null
+            : IconButton(
+                icon: const Icon(Icons.delete_outline, size: 20),
+                tooltip: l10n.deleteEvent,
+                onPressed: onDelete,
+              ),
       ),
     );
   }

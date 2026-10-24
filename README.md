@@ -107,7 +107,18 @@ flutter run -d chrome
 flutter run -d android
 ```
 
-### 5. Run on iOS Simulator
+### 5. Install a release-mode build on Android
+Connect your Samsung with USB debugging enabled, then find its Flutter device ID:
+```bash
+flutter devices
+flutter run --release -d <device-id>
+```
+
+This builds and installs the optimized release-mode app directly on the phone.
+The current Android release build uses the local debug signing key for personal
+testing; configure a private release keystore before distributing the APK.
+
+### 6. Run on iOS Simulator
 ```bash
 open -a Simulator
 flutter run -d iPhone

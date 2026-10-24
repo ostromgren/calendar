@@ -4,7 +4,9 @@ import 'package:calendar/l10n/generated/app_localizations.dart';
 
 import '../../../core/theme_localization.dart';
 import '../../calendar/view_models/calendar_view_model.dart';
+import '../view_models/device_calendars_view_model.dart';
 import '../view_models/theme_view_model.dart';
+import 'device_calendars_view.dart';
 import 'theme_selection_view.dart';
 
 /// The application settings view.
@@ -17,10 +19,12 @@ class SettingsView extends StatefulWidget {
     super.key,
     required this.themeViewModel,
     this.calendarViewModel,
+    this.deviceCalendarsViewModel,
   });
 
   final ThemeViewModel themeViewModel;
   final CalendarViewModel? calendarViewModel;
+  final DeviceCalendarsViewModel? deviceCalendarsViewModel;
 
   @override
   State<SettingsView> createState() => _SettingsViewState();
@@ -222,6 +226,44 @@ class _SettingsViewState extends State<SettingsView> {
               ),
 
               const Divider(height: 24),
+
+              if (widget.deviceCalendarsViewModel != null) ...[
+                _buildSectionHeader(context, l10n.accounts),
+                ListTile(
+                  leading: Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: colorScheme.secondaryContainer,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.account_circle_outlined,
+                      color: colorScheme.onSecondaryContainer,
+                      size: 20,
+                    ),
+                  ),
+                  title: Text(
+                    l10n.deviceCalendars,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: Text(
+                    l10n.deviceCalendarsDescription,
+                    style: TextStyle(color: colorScheme.onSurfaceVariant),
+                  ),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => DeviceCalendarsView(
+                          viewModel: widget.deviceCalendarsViewModel!,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                const Divider(height: 24),
+              ],
 
               // 3. About Section
               _buildSectionHeader(context, l10n.about),

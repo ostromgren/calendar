@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:calendar/domain/models/calendar_event.dart';
 import 'package:calendar/l10n/generated/app_localizations.dart';
 
 import '../../../../data/calendar_intent_service.dart';
+import '../../../../data/repositories/device_calendar_repository.dart';
 import '../../../../domain/models/external_calendar_event.dart';
 import '../../settings/view_models/theme_view_model.dart';
+import '../../settings/view_models/device_calendars_view_model.dart';
 import '../../settings/views/settings_view.dart';
 import '../../../../domain/models/local_calendar.dart';
 import '../view_models/calendar_view_model.dart';
@@ -31,26 +34,32 @@ class CalendarView extends StatefulWidget {
     required this.viewModel,
     required this.themeViewModel,
     this.intentService,
+    this.deviceCalendarsViewModel,
   });
 
   final CalendarViewModel viewModel;
   final ThemeViewModel themeViewModel;
   final CalendarIntentService? intentService;
+  final DeviceCalendarsViewModel? deviceCalendarsViewModel;
 
   @override
   State<CalendarView> createState() => _CalendarViewState();
 }
 
-class _CalendarViewState extends State<CalendarView> {
+class _CalendarViewState extends State<CalendarView>
+    with WidgetsBindingObserver {
   ThemeViewModel get _themeViewModel => widget.themeViewModel;
   bool _processingIncomingEvents = false;
+  DateTime? _requestedDeviceEventsMonth;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     widget.intentService?.addListener(_processIncomingEvents);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _processIncomingEvents();
+      _loadDeviceCalendars();
     });
   }
 
@@ -66,9 +75,61 @@ class _CalendarViewState extends State<CalendarView> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     widget.intentService?.removeListener(_processIncomingEvents);
     super.dispose();
   }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _loadDeviceCalendars();
+    }
+  }
+
+  Future<void> _loadDeviceCalendars() async {
+    final calendarsViewModel = widget.deviceCalendarsViewModel;
+    if (calendarsViewModel == null) return;
+    await calendarsViewModel.load();
+    if (mounted) {
+      _refreshDeviceEventsForMonth(widget.viewModel.focusedMonth);
+    }
+  }
+
+  void _refreshDeviceEventsForMonth(DateTime month) {
+    final calendarsViewModel = widget.deviceCalendarsViewModel;
+    if (calendarsViewModel == null) return;
+    final monthKey = DateTime(month.year, month.month);
+    if (_requestedDeviceEventsMonth == monthKey) return;
+    _requestedDeviceEventsMonth = monthKey;
+    final start = DateTime(
+      month.year,
+      month.month,
+      1,
+    ).subtract(const Duration(days: 7));
+    final end = DateTime(
+      month.year,
+      month.month + 1,
+      1,
+    ).add(const Duration(days: 7));
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        calendarsViewModel.refreshEventsForRange(start, end);
+      }
+    });
+  }
+
+  List<CalendarEvent> _eventsFor(DateTime date) {
+    final events = [
+      ...widget.viewModel.selectedDateEvents,
+      ...?widget.deviceCalendarsViewModel?.eventsFor(date),
+    ]..sort((first, second) => first.startTime.compareTo(second.startTime));
+    return events;
+  }
+
+  bool _hasEventsOn(DateTime date) =>
+      widget.viewModel.hasEventsOn(date) ||
+      (widget.deviceCalendarsViewModel?.hasEventsOn(date) ?? false);
 
   Future<void> _processIncomingEvents() async {
     final service = widget.intentService;
@@ -186,7 +247,7 @@ class _CalendarViewState extends State<CalendarView> {
       isSelected: isSelected,
       isToday: isToday,
       isCurrentMonth: isCurrentMonth,
-      hasEvents: widget.viewModel.hasEventsOn(date),
+      hasEvents: _hasEventsOn(date),
       onTap: () => widget.viewModel.selectDate(date),
     );
   }
@@ -226,6 +287,18 @@ class _CalendarViewState extends State<CalendarView> {
     BuildContext context, [
     ExternalCalendarEvent? initialEvent,
   ]) {
+    final calendarsViewModel = widget.deviceCalendarsViewModel;
+    final selectedCalendarIds =
+        calendarsViewModel?.selectedCalendarIds ?? const <String>{};
+    final deviceCalendars =
+        calendarsViewModel?.calendars
+            .where(
+              (calendar) =>
+                  !calendar.readOnly &&
+                  selectedCalendarIds.contains(calendar.id),
+            )
+            .toList(growable: false) ??
+        const <DeviceCalendarInfo>[];
     return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -238,6 +311,7 @@ class _CalendarViewState extends State<CalendarView> {
           selectedDate:
               initialEvent?.startTime ?? widget.viewModel.selectedDate,
           initialCalendar: widget.viewModel.lastUsedCalendar,
+          deviceCalendars: deviceCalendars,
           initialEvent: initialEvent,
           onSave:
               ({
@@ -246,20 +320,75 @@ class _CalendarViewState extends State<CalendarView> {
                 required DateTime startTime,
                 required DateTime endTime,
                 required LocalCalendar calendar,
+                required String? deviceCalendarId,
                 required bool isAllDay,
-              }) {
-                widget.viewModel.addEvent(
-                  title: title,
-                  description: description,
-                  startTime: startTime,
-                  endTime: endTime,
-                  calendar: calendar,
-                  isAllDay: isAllDay,
-                );
+              }) async {
+                if (deviceCalendarId == null) {
+                  widget.viewModel.addEvent(
+                    title: title,
+                    description: description,
+                    startTime: startTime,
+                    endTime: endTime,
+                    calendar: calendar,
+                    isAllDay: isAllDay,
+                  );
+                } else {
+                  final deviceCalendarsViewModel =
+                      widget.deviceCalendarsViewModel;
+                  if (deviceCalendarsViewModel == null) {
+                    throw StateError('Device calendar access is unavailable.');
+                  }
+                  await deviceCalendarsViewModel.createEvent(
+                    calendarId: deviceCalendarId,
+                    title: title,
+                    description: description,
+                    start: startTime,
+                    end: endTime,
+                    isAllDay: isAllDay,
+                  );
+                }
               },
         );
       },
     );
+  }
+
+  Future<void> _deleteEvent(CalendarEvent event) async {
+    final l10n = AppLocalizations.of(context)!;
+    if (event.isDeviceCalendarEvent) {
+      final shouldDelete = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Text(l10n.deleteSyncedEventTitle),
+          content: Text(l10n.deleteSyncedEventConfirmation),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: Text(l10n.cancel),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: Text(l10n.deleteEvent),
+            ),
+          ],
+        ),
+      );
+      if (shouldDelete != true) return;
+    }
+
+    try {
+      if (event.isDeviceCalendarEvent) {
+        await widget.deviceCalendarsViewModel!.deleteEvent(event.id);
+      } else {
+        widget.viewModel.deleteEvent(event.id);
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.calendarWriteError(error.toString()))),
+        );
+      }
+    }
   }
 
   @override
@@ -271,11 +400,15 @@ class _CalendarViewState extends State<CalendarView> {
     final today = DateTime(now.year, now.month, now.day);
 
     return ListenableBuilder(
-      listenable: widget.viewModel,
+      listenable: Listenable.merge([
+        widget.viewModel,
+        ?widget.deviceCalendarsViewModel,
+      ]),
       builder: (context, _) {
         final focusedMonth = widget.viewModel.focusedMonth;
+        _refreshDeviceEventsForMonth(focusedMonth);
         final selectedDate = widget.viewModel.selectedDate;
-        final events = widget.viewModel.selectedDateEvents;
+        final events = _eventsFor(selectedDate);
         final firstDay = widget.viewModel.firstDayOfWeek;
         final showWeekNumbers = widget.viewModel.showWeekNumbers;
         final gridDays = _buildMonthGrid(focusedMonth, firstDay);
@@ -290,14 +423,18 @@ class _CalendarViewState extends State<CalendarView> {
                 icon: const Icon(Icons.settings),
                 tooltip: l10n.settings,
                 onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => SettingsView(
-                        themeViewModel: _themeViewModel,
-                        calendarViewModel: widget.viewModel,
-                      ),
-                    ),
-                  );
+                  Navigator.of(context)
+                      .push(
+                        MaterialPageRoute(
+                          builder: (context) => SettingsView(
+                            themeViewModel: _themeViewModel,
+                            calendarViewModel: widget.viewModel,
+                            deviceCalendarsViewModel:
+                                widget.deviceCalendarsViewModel,
+                          ),
+                        ),
+                      )
+                      .then((_) => _loadDeviceCalendars());
                 },
               ),
             ],
@@ -431,13 +568,17 @@ class _CalendarViewState extends State<CalendarView> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          DateFormat(
-                            'EEEE, MMM d',
-                            locale,
-                          ).format(selectedDate),
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
+                        Expanded(
+                          child: Text(
+                            DateFormat(
+                              'EEEE, MMM d',
+                              locale,
+                            ).format(selectedDate),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                         Text(
@@ -484,7 +625,7 @@ class _CalendarViewState extends State<CalendarView> {
                       final event = events[index];
                       return EventTile(
                         event: event,
-                        onDelete: () => widget.viewModel.deleteEvent(event.id),
+                        onDelete: () => _deleteEvent(event),
                       );
                     },
                   ),
@@ -509,19 +650,22 @@ class _AddEventBottomSheet extends StatefulWidget {
   const _AddEventBottomSheet({
     required this.selectedDate,
     required this.initialCalendar,
+    required this.deviceCalendars,
     this.initialEvent,
     required this.onSave,
   });
 
   final DateTime selectedDate;
   final LocalCalendar initialCalendar;
+  final List<DeviceCalendarInfo> deviceCalendars;
   final ExternalCalendarEvent? initialEvent;
-  final void Function({
+  final Future<void> Function({
     required String title,
     required String description,
     required DateTime startTime,
     required DateTime endTime,
     required LocalCalendar calendar,
+    required String? deviceCalendarId,
     required bool isAllDay,
   })
   onSave;
@@ -537,7 +681,9 @@ class _AddEventBottomSheetState extends State<_AddEventBottomSheet> {
   TimeOfDay _startTime = const TimeOfDay(hour: 9, minute: 0);
   TimeOfDay _endTime = const TimeOfDay(hour: 10, minute: 0);
   bool _isAllDay = false;
-  late LocalCalendar _selectedCalendar;
+  late String _selectedCalendarId;
+  bool _isSaving = false;
+  String? _saveError;
   Animation<double>? _routeAnimation;
 
   @override
@@ -550,7 +696,7 @@ class _AddEventBottomSheetState extends State<_AddEventBottomSheet> {
       text: widget.initialEvent?.description ?? '',
     );
     _titleFocusNode = FocusNode();
-    _selectedCalendar = widget.initialCalendar;
+    _selectedCalendarId = 'local:${widget.initialCalendar.id}';
     _isAllDay = widget.initialEvent?.isAllDay ?? false;
     if (widget.initialEvent != null && !_isAllDay) {
       _startTime = TimeOfDay.fromDateTime(widget.initialEvent!.startTime);
@@ -595,6 +741,7 @@ class _AddEventBottomSheetState extends State<_AddEventBottomSheet> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
+    final navigator = Navigator.of(context);
     final locale = Localizations.localeOf(context).toString();
     final selectedDateFormatted = DateFormat(
       'EEEE, MMM d, yyyy',
@@ -646,29 +793,51 @@ class _AddEventBottomSheetState extends State<_AddEventBottomSheet> {
               ),
             ),
             const SizedBox(height: 16),
-            DropdownButtonFormField<LocalCalendar>(
+            DropdownButtonFormField<String>(
               key: const ValueKey('event-calendar-dropdown'),
-              initialValue: _selectedCalendar,
+              initialValue: _selectedCalendarId,
+              isExpanded: true,
               decoration: InputDecoration(
                 labelText: l10n.saveToCalendar,
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.calendar_month),
-                helperText: l10n.savedLocallyOnDevice,
+                helperText: _selectedCalendarId == 'local:personal'
+                    ? l10n.savedLocallyOnDevice
+                    : l10n.savedToDeviceCalendar,
               ),
-              items: LocalCalendar.all
-                  .map(
-                    (calendar) => DropdownMenuItem(
-                      value: calendar,
-                      child: Text(l10n.personalCalendar),
+              items: [
+                DropdownMenuItem(
+                  value: 'local:${LocalCalendar.personal.id}',
+                  child: Text(l10n.personalCalendar),
+                ),
+                ...widget.deviceCalendars.map(
+                  (calendar) => DropdownMenuItem(
+                    value: 'device:${calendar.id}',
+                    child: Text(
+                      calendar.accountName == null
+                          ? calendar.name
+                          : '${calendar.name} • ${calendar.accountName}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                  )
-                  .toList(),
-              onChanged: (calendar) {
-                if (calendar != null) {
-                  setState(() => _selectedCalendar = calendar);
-                }
-              },
+                  ),
+                ),
+              ],
+              onChanged: _isSaving
+                  ? null
+                  : (calendarId) {
+                      if (calendarId != null) {
+                        setState(() => _selectedCalendarId = calendarId);
+                      }
+                    },
             ),
+            if (_saveError != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                l10n.calendarWriteError(_saveError!),
+                style: TextStyle(color: theme.colorScheme.error),
+              ),
+            ],
             const SizedBox(height: 16),
             CheckboxListTile(
               key: const ValueKey('event-all-day-checkbox'),
@@ -721,37 +890,59 @@ class _AddEventBottomSheetState extends State<_AddEventBottomSheet> {
             SizedBox(
               width: double.infinity,
               child: FilledButton(
-                onPressed: () {
-                  final title = _titleController.text.trim();
-                  if (title.isEmpty) return;
+                onPressed: _isSaving
+                    ? null
+                    : () async {
+                        final title = _titleController.text.trim();
+                        if (title.isEmpty) return;
 
-                  final date = widget.selectedDate;
-                  final startDateTime = DateTime(
-                    date.year,
-                    date.month,
-                    date.day,
-                    _isAllDay ? 0 : _startTime.hour,
-                    _isAllDay ? 0 : _startTime.minute,
-                  );
-                  final endDateTime = DateTime(
-                    date.year,
-                    date.month,
-                    date.day,
-                    _isAllDay ? 0 : _endTime.hour,
-                    _isAllDay ? 0 : _endTime.minute,
-                  );
+                        final date = widget.selectedDate;
+                        final startDateTime = DateTime(
+                          date.year,
+                          date.month,
+                          date.day,
+                          _isAllDay ? 0 : _startTime.hour,
+                          _isAllDay ? 0 : _startTime.minute,
+                        );
+                        final endDateTime = _isAllDay
+                            ? DateTime(date.year, date.month, date.day + 1)
+                            : DateTime(
+                                date.year,
+                                date.month,
+                                date.day,
+                                _endTime.hour,
+                                _endTime.minute,
+                              );
 
-                  widget.onSave(
-                    title: title,
-                    description: _descriptionController.text.trim(),
-                    startTime: startDateTime,
-                    endTime: endDateTime,
-                    calendar: _selectedCalendar,
-                    isAllDay: _isAllDay,
-                  );
-
-                  Navigator.of(context).pop();
-                },
+                        setState(() {
+                          _isSaving = true;
+                          _saveError = null;
+                        });
+                        try {
+                          await widget.onSave(
+                            title: title,
+                            description: _descriptionController.text.trim(),
+                            startTime: startDateTime,
+                            endTime: endDateTime,
+                            calendar: LocalCalendar.personal,
+                            deviceCalendarId:
+                                _selectedCalendarId.startsWith('device:')
+                                ? _selectedCalendarId.substring(
+                                    'device:'.length,
+                                  )
+                                : null,
+                            isAllDay: _isAllDay,
+                          );
+                          if (!mounted) return;
+                          navigator.pop();
+                        } catch (error) {
+                          if (mounted) {
+                            setState(() => _saveError = error.toString());
+                          }
+                        } finally {
+                          if (mounted) setState(() => _isSaving = false);
+                        }
+                      },
                 child: Text(l10n.saveEvent),
               ),
             ),

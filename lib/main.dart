@@ -5,11 +5,13 @@ import 'package:calendar/l10n/generated/app_localizations.dart';
 
 import 'data/calendar_intent_service.dart';
 import 'data/repositories/calendar_repository.dart';
+import 'data/repositories/device_calendar_repository.dart';
 import 'data/repositories/settings_repository.dart';
 import 'ui/core/theme.dart';
 import 'ui/features/calendar/view_models/calendar_view_model.dart';
 import 'ui/features/calendar/views/calendar_view.dart';
 import 'ui/features/settings/view_models/theme_view_model.dart';
+import 'ui/features/settings/view_models/device_calendars_view_model.dart';
 
 /// Entry point of the Flutter application.
 ///
@@ -27,6 +29,10 @@ void main(List<String> arguments) async {
   // Instantiate dependencies manually here.
   // In larger apps, consider a dependency injection package such as get_it or riverpod.
   final calendarRepository = CalendarRepository();
+  final deviceCalendarsViewModel = DeviceCalendarsViewModel(
+    repository: NativeDeviceCalendarRepository(),
+    settingsRepository: settingsRepository,
+  );
   final calendarViewModel = CalendarViewModel(
     repository: calendarRepository,
     settingsRepository: settingsRepository,
@@ -37,6 +43,7 @@ void main(List<String> arguments) async {
     CalendarApp(
       viewModel: calendarViewModel,
       themeViewModel: themeViewModel,
+      deviceCalendarsViewModel: deviceCalendarsViewModel,
       intentService: intentService,
     ),
   );
@@ -52,11 +59,13 @@ class CalendarApp extends StatelessWidget {
     required this.viewModel,
     required this.themeViewModel,
     this.intentService,
+    this.deviceCalendarsViewModel,
   });
 
   final CalendarViewModel viewModel;
   final ThemeViewModel themeViewModel;
   final CalendarIntentService? intentService;
+  final DeviceCalendarsViewModel? deviceCalendarsViewModel;
 
   @override
   Widget build(BuildContext context) {
@@ -95,6 +104,7 @@ class CalendarApp extends StatelessWidget {
                 viewModel: viewModel,
                 themeViewModel: themeViewModel,
                 intentService: intentService,
+                deviceCalendarsViewModel: deviceCalendarsViewModel,
               ),
             );
           },

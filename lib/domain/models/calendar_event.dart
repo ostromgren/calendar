@@ -14,6 +14,8 @@ class CalendarEvent {
     this.calendarId = 'personal',
     this.description = '',
     this.color = Colors.blue,
+    this.readOnly = false,
+    this.isDeviceCalendarEvent = false,
   });
 
   final String id;
@@ -24,6 +26,8 @@ class CalendarEvent {
   final DateTime endTime;
   final bool isAllDay;
   final Color color;
+  final bool readOnly;
+  final bool isDeviceCalendarEvent;
 
   /// Returns true if this event falls on the specified [date] (ignoring time-of-day).
   bool isSameDay(DateTime date) {
@@ -42,6 +46,8 @@ class CalendarEvent {
     DateTime? endTime,
     bool? isAllDay,
     Color? color,
+    bool? readOnly,
+    bool? isDeviceCalendarEvent,
   }) {
     return CalendarEvent(
       id: id ?? this.id,
@@ -52,6 +58,9 @@ class CalendarEvent {
       endTime: endTime ?? this.endTime,
       isAllDay: isAllDay ?? this.isAllDay,
       color: color ?? this.color,
+      readOnly: readOnly ?? this.readOnly,
+      isDeviceCalendarEvent:
+          isDeviceCalendarEvent ?? this.isDeviceCalendarEvent,
     );
   }
 }

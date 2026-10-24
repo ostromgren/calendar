@@ -13,6 +13,7 @@ abstract final class _Keys {
   static const String showWeekNumbers = 'settings.show_week_numbers';
   static const String lastUsedCalendarId = 'settings.last_used_calendar_id';
   static const String appLanguage = 'settings.app_language';
+  static const String deviceCalendarIds = 'settings.device_calendar_ids';
 }
 
 /// Persists and retrieves user settings using [SharedPreferences].
@@ -135,4 +136,16 @@ class SettingsRepository {
   /// Persists the selected interface language.
   Future<void> saveAppLanguage(AppLanguage language) =>
       _prefs.setString(_Keys.appLanguage, language.name);
+
+  // ---------------------------------------------------------------------------
+  // Device calendars
+  // ---------------------------------------------------------------------------
+
+  /// Calendar IDs selected for display, or null before the user has selected.
+  List<String>? get deviceCalendarIds =>
+      _prefs.getStringList(_Keys.deviceCalendarIds);
+
+  /// Persists the device calendars whose events should appear in the app.
+  Future<void> saveDeviceCalendarIds(Iterable<String> calendarIds) =>
+      _prefs.setStringList(_Keys.deviceCalendarIds, calendarIds.toList());
 }

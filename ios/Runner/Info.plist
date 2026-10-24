@@ -24,6 +24,10 @@
 	<string>????</string>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<key>NSCalendarsUsageDescription</key>
+	<string>Calendar access lets you view calendars synced to this device.</string>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>Calendar access lets you view calendars synced to this device.</string>
 	<key>CFBundleDocumentTypes</key>
 	<array>
 		<dict>
