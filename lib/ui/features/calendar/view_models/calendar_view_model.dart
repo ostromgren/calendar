@@ -14,8 +14,7 @@ export 'package:calendar/domain/models/starting_day_of_week.dart';
 /// and delegates all event persistence to [CalendarRepository].
 /// Display-preference changes are automatically persisted via [SettingsRepository].
 ///
-/// Call [notifyListeners] after any mutation so that [ListenableBuilder]
-/// widgets rebuild automatically with the latest state.
+/// Riverpod exposes changes from this notifier to its consumers.
 class CalendarViewModel extends ChangeNotifier {
   CalendarViewModel({
     required this.repository,

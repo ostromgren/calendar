@@ -7,13 +7,14 @@ import 'package:calendar/data/repositories/calendar_repository.dart';
 import 'package:calendar/data/repositories/settings_repository.dart';
 import 'package:calendar/domain/models/app_language.dart';
 import 'package:calendar/l10n/generated/app_localizations.dart';
-import 'package:calendar/main.dart';
 import 'package:calendar/ui/features/calendar/calendar_greeting.dart';
 import 'package:calendar/ui/features/calendar/view_models/calendar_view_model.dart';
 import 'package:calendar/ui/features/settings/view_models/theme_view_model.dart';
+import 'test_app.dart';
 
 void main() {
-  Future<(CalendarViewModel, ThemeViewModel)> buildViewModels() async {
+  Future<(CalendarViewModel, ThemeViewModel, SettingsRepository)>
+  buildViewModels() async {
     SharedPreferences.setMockInitialValues({});
     final settings = await SettingsRepository.load();
     final viewModel = CalendarViewModel(
@@ -21,16 +22,20 @@ void main() {
       settingsRepository: settings,
     );
     final themeViewModel = ThemeViewModel(settingsRepository: settings);
-    return (viewModel, themeViewModel);
+    return (viewModel, themeViewModel, settings);
   }
 
   testWidgets('Calendar app renders header, grid, and event button', (
     tester,
   ) async {
-    final (viewModel, themeViewModel) = await buildViewModels();
+    final (viewModel, themeViewModel, settings) = await buildViewModels();
 
     await tester.pumpWidget(
-      CalendarApp(viewModel: viewModel, themeViewModel: themeViewModel),
+      createCalendarTestApp(
+        settingsRepository: settings,
+        calendarViewModel: viewModel,
+        themeViewModel: themeViewModel,
+      ),
     );
     await tester.pumpAndSettle();
     await tester.pumpAndSettle();
@@ -123,7 +128,11 @@ void main() {
     final themeViewModel = ThemeViewModel(settingsRepository: settings);
 
     await tester.pumpWidget(
-      CalendarApp(viewModel: viewModel, themeViewModel: themeViewModel),
+      createCalendarTestApp(
+        settingsRepository: settings,
+        calendarViewModel: viewModel,
+        themeViewModel: themeViewModel,
+      ),
     );
     await tester.pumpAndSettle();
 
@@ -140,10 +149,14 @@ void main() {
   testWidgets(
     'Whole-day events hide time pickers and save without a time range',
     (tester) async {
-      final (viewModel, themeViewModel) = await buildViewModels();
+      final (viewModel, themeViewModel, settings) = await buildViewModels();
 
       await tester.pumpWidget(
-        CalendarApp(viewModel: viewModel, themeViewModel: themeViewModel),
+        createCalendarTestApp(
+          settingsRepository: settings,
+          calendarViewModel: viewModel,
+          themeViewModel: themeViewModel,
+        ),
       );
       await tester.pumpAndSettle();
       await tester.tap(find.text('New Event'));
@@ -188,10 +201,14 @@ void main() {
   testWidgets('Swiping forward and backward changes focused month', (
     tester,
   ) async {
-    final (viewModel, themeViewModel) = await buildViewModels();
+    final (viewModel, themeViewModel, settings) = await buildViewModels();
 
     await tester.pumpWidget(
-      CalendarApp(viewModel: viewModel, themeViewModel: themeViewModel),
+      createCalendarTestApp(
+        settingsRepository: settings,
+        calendarViewModel: viewModel,
+        themeViewModel: themeViewModel,
+      ),
     );
     await tester.pumpAndSettle();
 

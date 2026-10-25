@@ -1,67 +1,66 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:calendar/l10n/generated/app_localizations.dart';
 
+import '../../../../providers.dart';
 import '../../../../data/repositories/device_calendar_repository.dart';
-import '../view_models/device_calendars_view_model.dart';
 
-class DeviceCalendarsView extends StatefulWidget {
-  const DeviceCalendarsView({super.key, required this.viewModel});
-
-  final DeviceCalendarsViewModel viewModel;
+class DeviceCalendarsView extends ConsumerStatefulWidget {
+  const DeviceCalendarsView({super.key});
 
   @override
-  State<DeviceCalendarsView> createState() => _DeviceCalendarsViewState();
+  ConsumerState<DeviceCalendarsView> createState() =>
+      _DeviceCalendarsViewState();
 }
 
-class _DeviceCalendarsViewState extends State<DeviceCalendarsView> {
+class _DeviceCalendarsViewState extends ConsumerState<DeviceCalendarsView> {
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) widget.viewModel.load();
+      if (mounted) ref.read(deviceCalendarsViewModelProvider).load();
     });
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final viewModel = ref.watch(deviceCalendarsViewModelProvider);
     return Scaffold(
       appBar: AppBar(
         title: Text(l10n.deviceCalendars),
         actions: [
-          if (widget.viewModel.isSupported && widget.viewModel.hasPermission)
+          if (viewModel.isSupported && viewModel.hasPermission)
             IconButton(
               tooltip: l10n.refreshCalendars,
-              onPressed: widget.viewModel.isLoading
-                  ? null
-                  : widget.viewModel.refresh,
+              onPressed: viewModel.isLoading ? null : viewModel.refresh,
               icon: const Icon(Icons.refresh),
             ),
         ],
       ),
       body: ListenableBuilder(
-        listenable: widget.viewModel,
+        listenable: viewModel,
         builder: (context, _) {
-          if (!widget.viewModel.isSupported) {
+          if (!viewModel.isSupported) {
             return _Message(text: l10n.deviceCalendarsUnavailable);
           }
-          if (widget.viewModel.isLoading && !widget.viewModel.hasPermission) {
+          if (viewModel.isLoading && !viewModel.hasPermission) {
             return const Center(child: CircularProgressIndicator());
           }
-          if (!widget.viewModel.hasPermission) {
+          if (!viewModel.hasPermission) {
             return _PermissionPrompt(
               explanation: l10n.deviceCalendarAccessExplanation,
               actionLabel: l10n.allowCalendarAccess,
-              isLoading: widget.viewModel.isLoading,
-              errorMessage: widget.viewModel.errorMessage,
-              onPressed: widget.viewModel.requestAccess,
-              onOpenSettings: widget.viewModel.openAppSettings,
+              isLoading: viewModel.isLoading,
+              errorMessage: viewModel.errorMessage,
+              onPressed: viewModel.requestAccess,
+              onOpenSettings: viewModel.openAppSettings,
               l10n: l10n,
             );
           }
 
           final groupedCalendars = <String, List<DeviceCalendarInfo>>{};
-          for (final calendar in widget.viewModel.calendars) {
+          for (final calendar in viewModel.calendars) {
             groupedCalendars
                 .putIfAbsent(calendar.accountName ?? '', () => [])
                 .add(calendar);
@@ -76,7 +75,7 @@ class _DeviceCalendarsViewState extends State<DeviceCalendarsView> {
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
               ),
-              if (widget.viewModel.errorMessage case final error?)
+              if (viewModel.errorMessage case final error?)
                 _ErrorMessage(message: l10n.calendarLoadError(error)),
               if (groupedCalendars.isEmpty)
                 _Message(text: l10n.noDeviceCalendars),
@@ -93,9 +92,7 @@ class _DeviceCalendarsViewState extends State<DeviceCalendarsView> {
                 ),
                 for (final calendar in entry.value)
                   CheckboxListTile(
-                    value: widget.viewModel.selectedCalendarIds.contains(
-                      calendar.id,
-                    ),
+                    value: viewModel.selectedCalendarIds.contains(calendar.id),
                     title: Text(calendar.name),
                     secondary: Icon(
                       Icons.calendar_month,
@@ -103,10 +100,7 @@ class _DeviceCalendarsViewState extends State<DeviceCalendarsView> {
                     ),
                     onChanged: (selected) {
                       if (selected != null) {
-                        widget.viewModel.setCalendarSelected(
-                          calendar.id,
-                          selected,
-                        );
+                        viewModel.setCalendarSelected(calendar.id, selected);
                       }
                     },
                   ),

@@ -6,7 +6,6 @@ import 'package:calendar/data/repositories/calendar_repository.dart';
 import 'package:calendar/data/repositories/settings_repository.dart';
 import 'package:calendar/domain/models/app_language.dart';
 import 'package:calendar/l10n/generated/app_localizations.dart';
-import 'package:calendar/main.dart';
 import 'package:calendar/ui/features/calendar/calendar_greeting.dart';
 import 'package:calendar/ui/core/theme.dart';
 import 'package:calendar/ui/features/calendar/view_models/calendar_view_model.dart';
@@ -14,6 +13,7 @@ import 'package:calendar/ui/features/settings/view_models/theme_view_model.dart'
 import 'package:calendar/ui/features/settings/views/settings_view.dart';
 import 'package:calendar/ui/features/calendar/views/widgets/week_number_cell.dart';
 import 'package:calendar/ui/features/settings/views/theme_selection_view.dart';
+import 'test_app.dart';
 
 void main() {
   group('Theme & Settings Feature Tests', () {
@@ -37,8 +37,9 @@ void main() {
       'Settings button (cog wheel) is present in top right AppBar and opens SettingsView',
       (tester) async {
         await tester.pumpWidget(
-          CalendarApp(
-            viewModel: calendarViewModel,
+          createCalendarTestApp(
+            settingsRepository: settingsRepository,
+            calendarViewModel: calendarViewModel,
             themeViewModel: themeViewModel,
           ),
         );
@@ -67,8 +68,9 @@ void main() {
       'Selecting Swedish localizes the app and persists the language',
       (tester) async {
         await tester.pumpWidget(
-          CalendarApp(
-            viewModel: calendarViewModel,
+          createCalendarTestApp(
+            settingsRepository: settingsRepository,
+            calendarViewModel: calendarViewModel,
             themeViewModel: themeViewModel,
           ),
         );
@@ -145,8 +147,9 @@ void main() {
       'Navigating from SettingsView to ThemeSelectionView shows 5 curated themes + dynamic theme',
       (tester) async {
         await tester.pumpWidget(
-          CalendarApp(
-            viewModel: calendarViewModel,
+          createCalendarTestApp(
+            settingsRepository: settingsRepository,
+            calendarViewModel: calendarViewModel,
             themeViewModel: themeViewModel,
           ),
         );
@@ -182,8 +185,9 @@ void main() {
       tester,
     ) async {
       await tester.pumpWidget(
-        CalendarApp(
-          viewModel: calendarViewModel,
+        createCalendarTestApp(
+          settingsRepository: settingsRepository,
+          calendarViewModel: calendarViewModel,
           themeViewModel: themeViewModel,
         ),
       );
@@ -224,8 +228,9 @@ void main() {
       tester,
     ) async {
       await tester.pumpWidget(
-        CalendarApp(
-          viewModel: calendarViewModel,
+        createCalendarTestApp(
+          settingsRepository: settingsRepository,
+          calendarViewModel: calendarViewModel,
           themeViewModel: themeViewModel,
         ),
       );
@@ -260,8 +265,9 @@ void main() {
       'Changing First Day of Week in SettingsView updates calendar grid and headers',
       (tester) async {
         await tester.pumpWidget(
-          CalendarApp(
-            viewModel: calendarViewModel,
+          createCalendarTestApp(
+            settingsRepository: settingsRepository,
+            calendarViewModel: calendarViewModel,
             themeViewModel: themeViewModel,
           ),
         );
@@ -323,8 +329,9 @@ void main() {
       'Toggling Show Week Numbers in SettingsView updates calendar view',
       (tester) async {
         await tester.pumpWidget(
-          CalendarApp(
-            viewModel: calendarViewModel,
+          createCalendarTestApp(
+            settingsRepository: settingsRepository,
+            calendarViewModel: calendarViewModel,
             themeViewModel: themeViewModel,
           ),
         );

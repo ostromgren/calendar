@@ -6,11 +6,11 @@ import 'package:calendar/data/repositories/calendar_repository.dart';
 import 'package:calendar/data/repositories/device_calendar_repository.dart';
 import 'package:calendar/data/repositories/settings_repository.dart';
 import 'package:calendar/domain/models/calendar_event.dart';
-import 'package:calendar/main.dart';
 import 'package:calendar/ui/features/calendar/view_models/calendar_view_model.dart';
 import 'package:calendar/ui/features/settings/view_models/device_calendars_view_model.dart';
 import 'package:calendar/ui/features/settings/view_models/theme_view_model.dart';
 import 'package:calendar/ui/features/settings/views/device_calendars_view.dart';
+import 'test_app.dart';
 
 class _FakeDeviceCalendarRepository implements DeviceCalendarRepository {
   @override
@@ -96,8 +96,9 @@ void main() {
         await createViewModels(_FakeDeviceCalendarRepository());
 
     await tester.pumpWidget(
-      CalendarApp(
-        viewModel: calendarViewModel,
+      createCalendarTestApp(
+        settingsRepository: deviceCalendarsViewModel.settingsRepository,
+        calendarViewModel: calendarViewModel,
         themeViewModel: themeViewModel,
         deviceCalendarsViewModel: deviceCalendarsViewModel,
       ),
@@ -139,8 +140,9 @@ void main() {
     final (calendarViewModel, themeViewModel, deviceCalendarsViewModel) =
         await createViewModels(repository);
     await tester.pumpWidget(
-      CalendarApp(
-        viewModel: calendarViewModel,
+      createCalendarTestApp(
+        settingsRepository: deviceCalendarsViewModel.settingsRepository,
+        calendarViewModel: calendarViewModel,
         themeViewModel: themeViewModel,
         deviceCalendarsViewModel: deviceCalendarsViewModel,
       ),

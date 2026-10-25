@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:calendar/domain/models/calendar_event.dart';
 import 'package:calendar/l10n/generated/app_localizations.dart';
 
 import '../../../../data/calendar_intent_service.dart';
 import '../../../../data/repositories/device_calendar_repository.dart';
+import '../../../../providers.dart';
 import '../../../../domain/models/external_calendar_event.dart';
-import '../../settings/view_models/theme_view_model.dart';
 import '../../settings/view_models/device_calendars_view_model.dart';
 import '../../settings/views/settings_view.dart';
 import '../../../../domain/models/local_calendar.dart';
@@ -27,29 +28,21 @@ import 'widgets/week_number_cell.dart';
 /// scrolls as one unified surface, avoiding layout overflows across different
 /// device sizes and orientations.
 ///
-/// Listens to [CalendarViewModel] via [ListenableBuilder] and rebuilds only
-/// when [CalendarViewModel.notifyListeners] is called.
-class CalendarView extends StatefulWidget {
-  const CalendarView({
-    super.key,
-    required this.viewModel,
-    required this.themeViewModel,
-    this.intentService,
-    this.deviceCalendarsViewModel,
-  });
+/// Watches calendar state through Riverpod and handles screen-level lifecycle.
+class CalendarView extends ConsumerStatefulWidget {
+  const CalendarView({super.key, this.intentService});
 
-  final CalendarViewModel viewModel;
-  final ThemeViewModel themeViewModel;
   final CalendarIntentService? intentService;
-  final DeviceCalendarsViewModel? deviceCalendarsViewModel;
 
   @override
-  State<CalendarView> createState() => _CalendarViewState();
+  ConsumerState<CalendarView> createState() => _CalendarViewState();
 }
 
-class _CalendarViewState extends State<CalendarView>
+class _CalendarViewState extends ConsumerState<CalendarView>
     with WidgetsBindingObserver {
-  ThemeViewModel get _themeViewModel => widget.themeViewModel;
+  CalendarViewModel get _viewModel => ref.read(calendarViewModelProvider);
+  DeviceCalendarsViewModel get _deviceCalendarsViewModel =>
+      ref.read(deviceCalendarsViewModelProvider);
   bool _processingIncomingEvents = false;
   DateTime? _requestedDeviceEventsMonth;
   bool _isAgendaView = false;
@@ -91,17 +84,15 @@ class _CalendarViewState extends State<CalendarView>
   }
 
   Future<void> _loadDeviceCalendars() async {
-    final calendarsViewModel = widget.deviceCalendarsViewModel;
-    if (calendarsViewModel == null) return;
+    final calendarsViewModel = _deviceCalendarsViewModel;
     await calendarsViewModel.load();
     if (mounted) {
-      _refreshDeviceEventsForMonth(widget.viewModel.focusedMonth);
+      _refreshDeviceEventsForMonth(_viewModel.focusedMonth);
     }
   }
 
   void _refreshDeviceEventsForMonth(DateTime month) {
-    final calendarsViewModel = widget.deviceCalendarsViewModel;
-    if (calendarsViewModel == null) return;
+    final calendarsViewModel = _deviceCalendarsViewModel;
     final monthKey = DateTime(month.year, month.month);
     if (_requestedDeviceEventsMonth == monthKey) return;
     _requestedDeviceEventsMonth = monthKey;
@@ -124,8 +115,8 @@ class _CalendarViewState extends State<CalendarView>
 
   List<CalendarEvent> _eventsFor(DateTime date) {
     final events = [
-      ...widget.viewModel.selectedDateEvents,
-      ...?widget.deviceCalendarsViewModel?.eventsFor(date),
+      ..._viewModel.selectedDateEvents,
+      ..._deviceCalendarsViewModel.eventsFor(date),
     ]..sort((first, second) => first.startTime.compareTo(second.startTime));
     return events;
   }
@@ -135,8 +126,8 @@ class _CalendarViewState extends State<CalendarView>
     final end = DateTime(month.year, month.month + 1);
     final events =
         [
-          ...widget.viewModel.repository.getAllEvents(),
-          ...?widget.deviceCalendarsViewModel?.events,
+          ..._viewModel.repository.getAllEvents(),
+          ..._deviceCalendarsViewModel.events,
         ]..removeWhere(
           (event) =>
               event.startTime.isBefore(start) || !event.startTime.isBefore(end),
@@ -156,8 +147,7 @@ class _CalendarViewState extends State<CalendarView>
   }
 
   bool _hasEventsOn(DateTime date) =>
-      widget.viewModel.hasEventsOn(date) ||
-      (widget.deviceCalendarsViewModel?.hasEventsOn(date) ?? false);
+      _viewModel.hasEventsOn(date) || _deviceCalendarsViewModel.hasEventsOn(date);
 
   Future<void> _processIncomingEvents() async {
     final service = widget.intentService;
@@ -167,7 +157,7 @@ class _CalendarViewState extends State<CalendarView>
     try {
       while (mounted && service.hasPendingEvents) {
         final event = service.takeNextEvent();
-        widget.viewModel.selectDate(event.startTime);
+        _viewModel.selectDate(event.startTime);
         await _showAddEventDialog(context, event);
       }
     } finally {
@@ -276,7 +266,7 @@ class _CalendarViewState extends State<CalendarView>
       isToday: isToday,
       isCurrentMonth: isCurrentMonth,
       hasEvents: _hasEventsOn(date),
-      onTap: () => widget.viewModel.selectDate(date),
+      onTap: () => _viewModel.selectDate(date),
     );
   }
 
@@ -296,13 +286,13 @@ class _CalendarViewState extends State<CalendarView>
     const distanceThreshold = 40.0;
 
     if (velocity < -velocityThreshold) {
-      widget.viewModel.nextMonth();
+      _viewModel.nextMonth();
     } else if (velocity > velocityThreshold) {
-      widget.viewModel.previousMonth();
+      _viewModel.previousMonth();
     } else if (_horizontalDragDelta < -distanceThreshold) {
-      widget.viewModel.nextMonth();
+      _viewModel.nextMonth();
     } else if (_horizontalDragDelta > distanceThreshold) {
-      widget.viewModel.previousMonth();
+      _viewModel.previousMonth();
     }
     _horizontalDragDelta = 0;
   }
@@ -315,18 +305,14 @@ class _CalendarViewState extends State<CalendarView>
     BuildContext context, [
     ExternalCalendarEvent? initialEvent,
   ]) {
-    final calendarsViewModel = widget.deviceCalendarsViewModel;
-    final selectedCalendarIds =
-        calendarsViewModel?.selectedCalendarIds ?? const <String>{};
-    final deviceCalendars =
-        calendarsViewModel?.calendars
-            .where(
-              (calendar) =>
-                  !calendar.readOnly &&
-                  selectedCalendarIds.contains(calendar.id),
-            )
-            .toList(growable: false) ??
-        const <DeviceCalendarInfo>[];
+    final calendarsViewModel = _deviceCalendarsViewModel;
+    final selectedCalendarIds = calendarsViewModel.selectedCalendarIds;
+    final deviceCalendars = calendarsViewModel.calendars
+        .where(
+          (calendar) =>
+              !calendar.readOnly && selectedCalendarIds.contains(calendar.id),
+        )
+        .toList(growable: false);
     return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -337,10 +323,9 @@ class _CalendarViewState extends State<CalendarView>
       builder: (sheetContext) {
         return _AddEventBottomSheet(
           selectedDate:
-              initialEvent?.startTime ?? widget.viewModel.selectedDate,
-          initialCalendar: widget.viewModel.lastUsedCalendar,
-          initialCalendarDestination:
-              widget.viewModel.lastUsedCalendarDestination,
+              initialEvent?.startTime ?? _viewModel.selectedDate,
+          initialCalendar: _viewModel.lastUsedCalendar,
+          initialCalendarDestination: _viewModel.lastUsedCalendarDestination,
           deviceCalendars: deviceCalendars,
           initialEvent: initialEvent,
           onSave:
@@ -354,7 +339,7 @@ class _CalendarViewState extends State<CalendarView>
                 required bool isAllDay,
               }) async {
                 if (deviceCalendarId == null) {
-                  widget.viewModel.addEvent(
+                  _viewModel.addEvent(
                     title: title,
                     description: description,
                     startTime: startTime,
@@ -363,12 +348,7 @@ class _CalendarViewState extends State<CalendarView>
                     isAllDay: isAllDay,
                   );
                 } else {
-                  final deviceCalendarsViewModel =
-                      widget.deviceCalendarsViewModel;
-                  if (deviceCalendarsViewModel == null) {
-                    throw StateError('Device calendar access is unavailable.');
-                  }
-                  await deviceCalendarsViewModel.createEvent(
+                  await calendarsViewModel.createEvent(
                     calendarId: deviceCalendarId,
                     title: title,
                     description: description,
@@ -376,9 +356,7 @@ class _CalendarViewState extends State<CalendarView>
                     end: endTime,
                     isAllDay: isAllDay,
                   );
-                  await widget.viewModel.rememberDeviceCalendar(
-                    deviceCalendarId,
-                  );
+                  await _viewModel.rememberDeviceCalendar(deviceCalendarId);
                 }
               },
         );
@@ -411,9 +389,9 @@ class _CalendarViewState extends State<CalendarView>
 
     try {
       if (event.isDeviceCalendarEvent) {
-        await widget.deviceCalendarsViewModel!.deleteEvent(event.id);
+        await _deviceCalendarsViewModel.deleteEvent(event.id);
       } else {
-        widget.viewModel.deleteEvent(event.id);
+        _viewModel.deleteEvent(event.id);
       }
     } catch (error) {
       if (mounted) {
@@ -426,29 +404,25 @@ class _CalendarViewState extends State<CalendarView>
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(calendarViewModelProvider);
+    ref.watch(deviceCalendarsViewModelProvider);
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
     final locale = Localizations.localeOf(context).toString();
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
 
-    return ListenableBuilder(
-      listenable: Listenable.merge([
-        widget.viewModel,
-        ?widget.deviceCalendarsViewModel,
-      ]),
-      builder: (context, _) {
-        final focusedMonth = widget.viewModel.focusedMonth;
-        _refreshDeviceEventsForMonth(focusedMonth);
-        final selectedDate = widget.viewModel.selectedDate;
-        final events = _eventsFor(selectedDate);
-        final agendaEvents = _agendaEventsFor(focusedMonth);
-        final firstDay = widget.viewModel.firstDayOfWeek;
-        final showWeekNumbers = widget.viewModel.showWeekNumbers;
-        final gridDays = _buildMonthGrid(focusedMonth, firstDay);
-        final weekdayHeaders = _buildWeekdayLabels(firstDay, l10n);
+    final focusedMonth = _viewModel.focusedMonth;
+    _refreshDeviceEventsForMonth(focusedMonth);
+    final selectedDate = _viewModel.selectedDate;
+    final events = _eventsFor(selectedDate);
+    final agendaEvents = _agendaEventsFor(focusedMonth);
+    final firstDay = _viewModel.firstDayOfWeek;
+    final showWeekNumbers = _viewModel.showWeekNumbers;
+    final gridDays = _buildMonthGrid(focusedMonth, firstDay);
+    final weekdayHeaders = _buildWeekdayLabels(firstDay, l10n);
 
-        return Scaffold(
+    return Scaffold(
           appBar: AppBar(
             title: FittedBox(
               fit: BoxFit.scaleDown,
@@ -474,12 +448,7 @@ class _CalendarViewState extends State<CalendarView>
                   Navigator.of(context)
                       .push(
                         MaterialPageRoute(
-                          builder: (context) => SettingsView(
-                            themeViewModel: _themeViewModel,
-                            calendarViewModel: widget.viewModel,
-                            deviceCalendarsViewModel:
-                                widget.deviceCalendarsViewModel,
-                          ),
+                          builder: (context) => const SettingsView(),
                         ),
                       )
                       .then((_) => _loadDeviceCalendars());
@@ -511,9 +480,9 @@ class _CalendarViewState extends State<CalendarView>
                       SliverToBoxAdapter(
                         child: MonthHeader(
                           focusedMonth: focusedMonth,
-                          onPreviousMonth: widget.viewModel.previousMonth,
-                          onNextMonth: widget.viewModel.nextMonth,
-                          onToday: widget.viewModel.goToToday,
+                          onPreviousMonth: _viewModel.previousMonth,
+                          onNextMonth: _viewModel.nextMonth,
+                          onToday: _viewModel.goToToday,
                         ),
                       ),
 
@@ -758,8 +727,6 @@ class _CalendarViewState extends State<CalendarView>
               );
             },
           ),
-        );
-      },
     );
   }
 }

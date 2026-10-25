@@ -1,20 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:calendar/l10n/generated/app_localizations.dart';
 
+import '../../../../providers.dart';
 import '../../../core/theme.dart';
 import '../../../core/theme_localization.dart';
-import '../view_models/theme_view_model.dart';
 
 /// Screen allowing the user to select their calendar theme and brightness mode.
 ///
 /// Features 5 curated themes plus Android 12+ dynamic system palette support.
-class ThemeSelectionView extends StatelessWidget {
-  const ThemeSelectionView({super.key, required this.themeViewModel});
-
-  final ThemeViewModel themeViewModel;
+class ThemeSelectionView extends ConsumerWidget {
+  const ThemeSelectionView({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final themeViewModel = ref.watch(themeViewModelProvider);
     return ListenableBuilder(
       listenable: themeViewModel,
       builder: (context, _) {

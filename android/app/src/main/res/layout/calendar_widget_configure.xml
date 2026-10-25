@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#FFF8FAFC"
+    android:gravity="center_vertical"
+    android:orientation="vertical"
+    android:padding="24dp">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/calendar_widget_transparency"
+        android:textColor="#FF1F2937"
+        android:textSize="20sp"
+        android:textStyle="bold"/>
+
+    <TextView
+        android:id="@+id/widget_transparency_value"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:textColor="#FF475569"
+        android:textSize="14sp"/>
+
+    <SeekBar
+        android:id="@+id/widget_transparency_seekbar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:max="80"/>
+
+    <Button
+        android:id="@+id/widget_save"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="20dp"
+        android:text="@string/calendar_widget_save"/>
+</LinearLayout>

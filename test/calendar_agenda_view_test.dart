@@ -1,13 +1,13 @@
 import 'package:calendar/data/repositories/calendar_repository.dart';
 import 'package:calendar/data/repositories/settings_repository.dart';
 import 'package:calendar/domain/models/calendar_event.dart';
-import 'package:calendar/main.dart';
 import 'package:calendar/ui/features/calendar/view_models/calendar_view_model.dart';
 import 'package:calendar/ui/features/calendar/views/widgets/month_header.dart';
 import 'package:calendar/ui/features/settings/view_models/theme_view_model.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'test_app.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -36,7 +36,11 @@ void main() {
     final themeViewModel = ThemeViewModel(settingsRepository: settings);
 
     await tester.pumpWidget(
-      CalendarApp(viewModel: calendarViewModel, themeViewModel: themeViewModel),
+      createCalendarTestApp(
+        settingsRepository: settings,
+        calendarViewModel: calendarViewModel,
+        themeViewModel: themeViewModel,
+      ),
     );
     await tester.pumpAndSettle();
 
@@ -68,7 +72,11 @@ void main() {
     final themeViewModel = ThemeViewModel(settingsRepository: settings);
 
     await tester.pumpWidget(
-      CalendarApp(viewModel: calendarViewModel, themeViewModel: themeViewModel),
+      createCalendarTestApp(
+        settingsRepository: settings,
+        calendarViewModel: calendarViewModel,
+        themeViewModel: themeViewModel,
+      ),
     );
     await tester.pumpAndSettle();
 
