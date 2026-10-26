@@ -51,7 +51,7 @@
             android:name=".CalendarWidgetConfigureActivity"
             android:exported="true"
             android:label="Calendar widget"
-            android:theme="@android:style/Theme.Material.Light.NoActionBar">
+            android:theme="@style/WidgetConfigureTheme">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE"/>
             </intent-filter>

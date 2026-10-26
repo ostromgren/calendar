@@ -12,6 +12,7 @@ class CalendarEvent {
     required this.endTime,
     this.isAllDay = false,
     this.calendarId = 'personal',
+    this.categoryId,
     this.description = '',
     this.color = Colors.blue,
     this.readOnly = false,
@@ -22,6 +23,7 @@ class CalendarEvent {
   final String title;
   final String description;
   final String calendarId;
+  final String? categoryId;
   final DateTime startTime;
   final DateTime endTime;
   final bool isAllDay;
@@ -42,6 +44,7 @@ class CalendarEvent {
     String? title,
     String? description,
     String? calendarId,
+    String? categoryId,
     DateTime? startTime,
     DateTime? endTime,
     bool? isAllDay,
@@ -54,6 +57,7 @@ class CalendarEvent {
       title: title ?? this.title,
       description: description ?? this.description,
       calendarId: calendarId ?? this.calendarId,
+      categoryId: categoryId ?? this.categoryId,
       startTime: startTime ?? this.startTime,
       endTime: endTime ?? this.endTime,
       isAllDay: isAllDay ?? this.isAllDay,

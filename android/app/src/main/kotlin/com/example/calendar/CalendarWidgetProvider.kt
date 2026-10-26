@@ -19,6 +19,7 @@ import androidx.core.content.ContextCompat
 import org.json.JSONArray
 import org.json.JSONException
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import java.util.concurrent.TimeUnit
@@ -67,6 +68,7 @@ class CalendarWidgetProvider : AppWidgetProvider() {
         private const val PREFS = "calendar_widget_preferences"
         private const val DEFAULT_TRANSPARENCY = 20
         private const val MAX_TRANSPARENCY = 80
+        private const val EVENT_DATE_WINDOW_DAYS = 7
         private const val SHOW_EVENT_WIDTH_DP = 180
         private const val SHOW_SECOND_EVENT_HEIGHT_DP = 150
 
@@ -139,6 +141,7 @@ class CalendarWidgetProvider : AppWidgetProvider() {
                             calendarData.events[0],
                             R.id.widget_event_one_time,
                             R.id.widget_event_one_title,
+                            now,
                         )
                         val secondEvent = calendarData.events.getOrNull(1)
                         if (showsSecondEvent && secondEvent != null) {
@@ -148,6 +151,7 @@ class CalendarWidgetProvider : AppWidgetProvider() {
                                 secondEvent,
                                 R.id.widget_event_two_time,
                                 R.id.widget_event_two_title,
+                                now,
                             )
                             views.setViewVisibility(R.id.widget_event_two, View.VISIBLE)
                         } else {
@@ -173,13 +177,23 @@ class CalendarWidgetProvider : AppWidgetProvider() {
             event: WidgetEvent,
             timeViewId: Int,
             titleViewId: Int,
+            now: Long,
         ) {
             val time = if (event.allDay) {
                 context.getString(R.string.calendar_widget_all_day)
             } else {
                 DateFormat.getTimeFormat(context).format(Date(event.begin))
             }
-            views.setTextViewText(timeViewId, time)
+            val date = Calendar.getInstance().apply {
+                timeInMillis = now
+                add(Calendar.DAY_OF_YEAR, EVENT_DATE_WINDOW_DAYS)
+            }.timeInMillis
+            val summary = if (event.begin >= now && event.begin < date) {
+                "${DateFormat.getDateFormat(context).format(Date(event.begin))} · $time"
+            } else {
+                time
+            }
+            views.setTextViewText(timeViewId, summary)
             views.setTextViewText(titleViewId, event.title)
         }
 
@@ -199,7 +213,10 @@ class CalendarWidgetProvider : AppWidgetProvider() {
                 return CalendarData(failedToLoad = true)
             }
             val start = now - TimeUnit.DAYS.toMillis(1)
-            val end = now + TimeUnit.DAYS.toMillis(90)
+            val end = Calendar.getInstance().apply {
+                timeInMillis = now
+                add(Calendar.DAY_OF_YEAR, EVENT_DATE_WINDOW_DAYS)
+            }.timeInMillis
             val instancesUri: Uri = CalendarContract.Instances.CONTENT_URI.buildUpon()
                 .appendPath(start.toString())
                 .appendPath(end.toString())
@@ -236,10 +253,12 @@ class CalendarWidgetProvider : AppWidgetProvider() {
                 while (it.moveToNext() && events.size < 2) {
                     val calendarId = it.getString(calendarColumn)
                     if (selectedIds != null && calendarId !in selectedIds) continue
+                    val begin = it.getLong(beginColumn)
+                    if (begin >= end) continue
                     events += WidgetEvent(
                         title = it.getString(titleColumn)?.takeIf(String::isNotBlank)
                             ?: context.getString(R.string.calendar_widget_untitled),
-                        begin = it.getLong(beginColumn),
+                        begin = begin,
                         allDay = it.getInt(allDayColumn) != 0,
                     )
                 }

@@ -6,12 +6,9 @@ class LocalCalendar {
   final String name;
 
   static const personal = LocalCalendar(id: 'personal', name: 'Personal');
-  static const all = [personal];
 
-  static LocalCalendar fromId(String id) {
-    return all.firstWhere(
-      (calendar) => calendar.id == id,
-      orElse: () => personal,
-    );
-  }
+  Map<String, Object> toJson() => {'id': id, 'name': name};
+
+  factory LocalCalendar.fromJson(Map<String, dynamic> json) =>
+      LocalCalendar(id: json['id'] as String, name: json['name'] as String);
 }

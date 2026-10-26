@@ -53,12 +53,12 @@ private struct CalendarProvider: TimelineProvider {
 
     let store = EKEventStore()
     let startOfToday = Calendar.current.startOfDay(for: now)
-    let end = Calendar.current.date(byAdding: .day, value: 90, to: startOfToday) ?? now
+    let end = Calendar.current.date(byAdding: .day, value: 7, to: now) ?? now
     let predicate = store.predicateForEvents(withStart: startOfToday, end: end, calendars: nil)
     let events = store.events(matching: predicate)
-      .filter { $0.endDate > now }
+      .filter { $0.endDate > now && $0.startDate < end }
       .sorted { $0.startDate < $1.startDate }
-      .prefix(2)
+      .prefix(1)
       .map {
         CalendarWidgetEvent(
           id: $0.eventIdentifier ?? UUID().uuidString,
@@ -85,18 +85,15 @@ private struct CalendarWidgetView: View {
           .fill(.primary.opacity(0.14))
           .frame(width: 1)
 
-        VStack(alignment: .leading, spacing: family == .systemLarge ? 8 : 12) {
-          eventRow(at: 0)
-          if family == .systemLarge {
-            eventRow(at: 1)
-          }
+        VStack(alignment: .leading, spacing: 12) {
+          eventRow
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
       }
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)
     .padding(.horizontal, 16)
-    .padding(.vertical, family == .systemLarge ? 8 : 16)
+    .padding(.vertical, 16)
     .containerBackground(.background, for: .widget)
   }
 
@@ -116,10 +113,10 @@ private struct CalendarWidgetView: View {
   }
 
   @ViewBuilder
-  private func eventRow(at index: Int) -> some View {
-    if let event = entry.events[safe: index] {
+  private var eventRow: some View {
+    if let event = entry.events.first {
       VStack(alignment: .leading, spacing: 3) {
-        Text(event.isAllDay ? "All day" : event.startDate.formatted(date: .omitted, time: .shortened))
+        Text(eventSummary(for: event))
           .font(.caption.weight(.semibold))
           .foregroundStyle(.tint)
           .lineLimit(1)
@@ -128,7 +125,7 @@ private struct CalendarWidgetView: View {
           .lineLimit(2)
           .multilineTextAlignment(.leading)
       }
-    } else if index == 0 {
+    } else {
       Text(
         entry.hasCalendarAccess
           ? "No upcoming events"
@@ -139,11 +136,21 @@ private struct CalendarWidgetView: View {
       .lineLimit(3)
     }
   }
-}
 
-private extension Collection {
-  subscript(safe index: Index) -> Element? {
-    indices.contains(index) ? self[index] : nil
+  private func eventSummary(for event: CalendarWidgetEvent) -> String {
+    let time = event.isAllDay
+      ? "All day"
+      : event.startDate.formatted(date: .omitted, time: .shortened)
+    guard
+      event.startDate >= entry.date,
+      let dateLimit = Calendar.current.date(byAdding: .day, value: 7, to: entry.date),
+      event.startDate < dateLimit
+    else {
+      return time
+    }
+
+    let date = event.startDate.formatted(date: .abbreviated, time: .omitted)
+    return "\(date) · \(time)"
   }
 }
 
@@ -157,6 +164,6 @@ struct CalendarWidget: Widget {
     }
     .configurationDisplayName("Calendar")
     .description("Today's date and your next events.")
-    .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
+    .supportedFamilies([.systemSmall, .systemMedium])
   }
 }

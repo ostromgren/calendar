@@ -2,7 +2,10 @@
     <string name="calendar_widget_description">Today\'s date and upcoming events</string>
     <string name="calendar_widget_transparency">Background transparency</string>
     <string name="calendar_widget_transparency_value">%1$d%%</string>
+    <string name="calendar_widget_settings_title">Calendar widget</string>
+    <string name="calendar_widget_settings_description">Personalize your widget</string>
     <string name="calendar_widget_save">Save widget</string>
+    <string name="calendar_widget_cancel">Cancel</string>
     <string name="calendar_widget_permission">Open Calendar to allow calendar access and see your events.</string>
     <string name="calendar_widget_no_events">No upcoming events</string>
     <string name="calendar_widget_load_error">Couldn\'t load calendar events.</string>

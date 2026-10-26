@@ -7,6 +7,7 @@ import '../../../../providers.dart';
 import '../../../core/theme_localization.dart';
 import '../../calendar/view_models/calendar_view_model.dart';
 import 'device_calendars_view.dart';
+import 'local_calendars_view.dart';
 import 'theme_selection_view.dart';
 
 /// The application settings view.
@@ -176,6 +177,34 @@ class SettingsView extends ConsumerWidget {
             subtitle: Text(l10n.weekNumbersDescription),
             value: calendarViewModel.showWeekNumbers,
             onChanged: calendarViewModel.setShowWeekNumbers,
+          ),
+          const Divider(height: 24),
+          _buildSectionHeader(context, l10n.localCalendars),
+          ListTile(
+            leading: Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: colorScheme.primaryContainer,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.calendar_month_outlined,
+                color: colorScheme.onPrimaryContainer,
+                size: 20,
+              ),
+            ),
+            title: Text(
+              l10n.localCalendars,
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+            subtitle: Text(l10n.localCalendarsDescription),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (context) => const LocalCalendarsView(),
+              ),
+            ),
           ),
           const Divider(height: 24),
           if (deviceCalendarsViewModel.isSupported) ...[

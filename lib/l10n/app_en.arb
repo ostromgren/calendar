@@ -35,10 +35,30 @@
   },
   "eventTitle": "Event Title",
   "descriptionOptional": "Description (optional)",
+  "expandDescription": "Show full description",
+  "collapseDescription": "Collapse description",
   "saveToCalendar": "Save to calendar",
   "savedLocallyOnDevice": "Saved locally on this device",
   "savedToDeviceCalendar": "Saved to the selected synced calendar",
   "personalCalendar": "Personal",
+  "localCalendars": "Local calendars",
+  "localCalendarsDescription": "Manage calendars, categories, and colors",
+  "addLocalCalendar": "Add local calendar",
+  "renameLocalCalendar": "Rename calendar",
+  "addCategory": "Add category",
+  "categoryName": "Category name",
+  "categoryColor": "Category color",
+  "name": "Name",
+  "save": "Save",
+  "localCalendarSaveError": "Couldn't save calendar settings: {error}",
+  "@localCalendarSaveError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "noCategory": "No category",
   "startTime": "Start: {time}",
   "@startTime": {
     "placeholders": {

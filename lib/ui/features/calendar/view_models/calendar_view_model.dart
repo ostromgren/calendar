@@ -1,7 +1,8 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:calendar/data/repositories/calendar_repository.dart';
 import 'package:calendar/data/repositories/settings_repository.dart';
 import 'package:calendar/domain/models/calendar_event.dart';
+import 'package:calendar/domain/models/event_category.dart';
 import 'package:calendar/domain/models/local_calendar.dart';
 import 'package:calendar/domain/models/starting_day_of_week.dart';
 
@@ -26,6 +27,8 @@ class CalendarViewModel extends ChangeNotifier {
            initialFirstDayOfWeek ?? settingsRepository.firstDayOfWeek,
        _showWeekNumbers =
            initialShowWeekNumbers ?? settingsRepository.showWeekNumbers,
+       _localCalendars = settingsRepository.localCalendars,
+       _eventCategories = settingsRepository.getEventCategories(),
        _lastUsedCalendar = settingsRepository.lastUsedCalendar {
     final now = DateTime.now();
     _selectedDate = DateTime(now.year, now.month, now.day);
@@ -39,6 +42,8 @@ class CalendarViewModel extends ChangeNotifier {
   late DateTime _focusedMonth;
   StartingDayOfWeek _firstDayOfWeek;
   bool _showWeekNumbers;
+  List<LocalCalendar> _localCalendars;
+  List<EventCategory> _eventCategories;
   LocalCalendar _lastUsedCalendar;
 
   DateTime get selectedDate => _selectedDate;
@@ -52,6 +57,67 @@ class CalendarViewModel extends ChangeNotifier {
 
   /// Calendar selected by default when adding the next event.
   LocalCalendar get lastUsedCalendar => _lastUsedCalendar;
+  List<LocalCalendar> get localCalendars => List.unmodifiable(_localCalendars);
+
+  List<EventCategory> categoriesFor(String calendarId) => List.unmodifiable(
+    _eventCategories.where((category) => category.calendarId == calendarId),
+  );
+
+  Future<void> addLocalCalendar(String name) async {
+    final normalizedName = name.trim();
+    if (normalizedName.isEmpty) {
+      throw ArgumentError.value(name, 'name', 'Calendar name cannot be empty.');
+    }
+    final calendar = LocalCalendar(
+      id: 'local-${DateTime.now().microsecondsSinceEpoch}',
+      name: normalizedName,
+    );
+    final calendars = [..._localCalendars, calendar];
+    await _settings.saveLocalCalendars(calendars);
+    _localCalendars = calendars;
+    notifyListeners();
+  }
+
+  Future<void> renameLocalCalendar(String id, String name) async {
+    final normalizedName = name.trim();
+    if (normalizedName.isEmpty) {
+      throw ArgumentError.value(name, 'name', 'Calendar name cannot be empty.');
+    }
+    final calendars = _localCalendars
+        .map(
+          (calendar) => calendar.id == id
+              ? LocalCalendar(id: calendar.id, name: normalizedName)
+              : calendar,
+        )
+        .toList(growable: false);
+    await _settings.saveLocalCalendars(calendars);
+    _localCalendars = calendars;
+    if (_lastUsedCalendar.id == id) {
+      _lastUsedCalendar = calendars.firstWhere((calendar) => calendar.id == id);
+    }
+    notifyListeners();
+  }
+
+  Future<void> addEventCategory({
+    required String calendarId,
+    required String name,
+    required Color color,
+  }) async {
+    final normalizedName = name.trim();
+    if (normalizedName.isEmpty) {
+      throw ArgumentError.value(name, 'name', 'Category name cannot be empty.');
+    }
+    final category = EventCategory(
+      id: 'category-${DateTime.now().microsecondsSinceEpoch}',
+      calendarId: calendarId,
+      name: normalizedName,
+      color: color,
+    );
+    final categories = [..._eventCategories, category];
+    await _settings.saveEventCategories(categories);
+    _eventCategories = categories;
+    notifyListeners();
+  }
 
   /// Destination selected by default when adding the next event.
   String get lastUsedCalendarDestination =>
@@ -118,6 +184,8 @@ class CalendarViewModel extends ChangeNotifier {
     required DateTime startTime,
     required DateTime endTime,
     required LocalCalendar calendar,
+    String? categoryId,
+    Color? categoryColor,
     bool isAllDay = false,
   }) {
     final newEvent = CalendarEvent(
@@ -125,9 +193,11 @@ class CalendarViewModel extends ChangeNotifier {
       title: title,
       description: description,
       calendarId: calendar.id,
+      categoryId: categoryId,
       startTime: startTime,
       endTime: endTime,
       isAllDay: isAllDay,
+      color: categoryColor ?? Colors.blue,
     );
     repository.addEvent(newEvent);
     _lastUsedCalendar = calendar;

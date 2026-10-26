@@ -8,6 +8,7 @@ import '../../../../data/calendar_intent_service.dart';
 import '../../../../data/repositories/device_calendar_repository.dart';
 import '../../../../providers.dart';
 import '../../../../domain/models/external_calendar_event.dart';
+import '../../../../domain/models/event_category.dart';
 import '../../settings/view_models/device_calendars_view_model.dart';
 import '../../settings/views/settings_view.dart';
 import '../../../../domain/models/local_calendar.dart';
@@ -147,7 +148,13 @@ class _CalendarViewState extends ConsumerState<CalendarView>
   }
 
   bool _hasEventsOn(DateTime date) =>
-      _viewModel.hasEventsOn(date) || _deviceCalendarsViewModel.hasEventsOn(date);
+      _viewModel.hasEventsOn(date) ||
+      _deviceCalendarsViewModel.hasEventsOn(date);
+
+  List<Color> _eventColorsOn(DateTime date) => {
+    ..._viewModel.repository.getEventsForDay(date).map((event) => event.color),
+    ..._deviceCalendarsViewModel.eventsFor(date).map((event) => event.color),
+  }.toList(growable: false);
 
   Future<void> _processIncomingEvents() async {
     final service = widget.intentService;
@@ -266,6 +273,7 @@ class _CalendarViewState extends ConsumerState<CalendarView>
       isToday: isToday,
       isCurrentMonth: isCurrentMonth,
       hasEvents: _hasEventsOn(date),
+      eventColors: _eventColorsOn(date),
       onTap: () => _viewModel.selectDate(date),
     );
   }
@@ -322,10 +330,11 @@ class _CalendarViewState extends ConsumerState<CalendarView>
       ),
       builder: (sheetContext) {
         return _AddEventBottomSheet(
-          selectedDate:
-              initialEvent?.startTime ?? _viewModel.selectedDate,
+          selectedDate: initialEvent?.startTime ?? _viewModel.selectedDate,
           initialCalendar: _viewModel.lastUsedCalendar,
           initialCalendarDestination: _viewModel.lastUsedCalendarDestination,
+          localCalendars: _viewModel.localCalendars,
+          categoriesForCalendar: _viewModel.categoriesFor,
           deviceCalendars: deviceCalendars,
           initialEvent: initialEvent,
           onSave:
@@ -335,6 +344,8 @@ class _CalendarViewState extends ConsumerState<CalendarView>
                 required DateTime startTime,
                 required DateTime endTime,
                 required LocalCalendar calendar,
+                required String? categoryId,
+                required Color? categoryColor,
                 required String? deviceCalendarId,
                 required bool isAllDay,
               }) async {
@@ -345,6 +356,8 @@ class _CalendarViewState extends ConsumerState<CalendarView>
                     startTime: startTime,
                     endTime: endTime,
                     calendar: calendar,
+                    categoryId: categoryId,
+                    categoryColor: categoryColor,
                     isAllDay: isAllDay,
                   );
                 } else {
@@ -423,310 +436,291 @@ class _CalendarViewState extends ConsumerState<CalendarView>
     final weekdayHeaders = _buildWeekdayLabels(firstDay, l10n);
 
     return Scaffold(
-          appBar: AppBar(
-            title: FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Text(
-                calendarGreeting(l10n, now),
-                maxLines: 1,
-                softWrap: false,
-              ),
-            ),
-            centerTitle: true,
-            leading: IconButton(
-              icon: Icon(
-                _isAgendaView ? Icons.calendar_month : Icons.view_agenda,
-              ),
-              tooltip: _isAgendaView ? l10n.calendarView : l10n.agendaView,
-              onPressed: () => setState(() => _isAgendaView = !_isAgendaView),
-            ),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.settings),
-                tooltip: l10n.settings,
-                onPressed: () {
-                  Navigator.of(context)
-                      .push(
-                        MaterialPageRoute(
-                          builder: (context) => const SettingsView(),
-                        ),
-                      )
-                      .then((_) => _loadDeviceCalendars());
-                },
-              ),
-            ],
+      appBar: AppBar(
+        title: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            calendarGreeting(l10n, now),
+            maxLines: 1,
+            softWrap: false,
           ),
-          floatingActionButton: FloatingActionButton.extended(
-            onPressed: () => _showAddEventDialog(context),
-            icon: const Icon(Icons.add),
-            label: Text(l10n.newEvent),
+        ),
+        centerTitle: true,
+        leading: IconButton(
+          icon: Icon(_isAgendaView ? Icons.calendar_month : Icons.view_agenda),
+          tooltip: _isAgendaView ? l10n.calendarView : l10n.agendaView,
+          onPressed: () => setState(() => _isAgendaView = !_isAgendaView),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.settings),
+            tooltip: l10n.settings,
+            onPressed: () {
+              Navigator.of(context)
+                  .push(
+                    MaterialPageRoute(
+                      builder: (context) => const SettingsView(),
+                    ),
+                  )
+                  .then((_) => _loadDeviceCalendars());
+            },
           ),
-          body: LayoutBuilder(
-            builder: (context, constraints) {
-              final horizontalPadding = constraints.maxWidth >= 600
-                  ? 24.0
-                  : 0.0;
-              return GestureDetector(
-                behavior: HitTestBehavior.translucent,
-                onHorizontalDragStart: _onHorizontalDragStart,
-                onHorizontalDragUpdate: _onHorizontalDragUpdate,
-                onHorizontalDragEnd: _onHorizontalDragEnd,
-                onHorizontalDragCancel: _onHorizontalDragCancel,
-                child: Padding(
-                  padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-                  child: CustomScrollView(
-                    slivers: [
-                      // 1. Month Header (Previous / Next / Today)
-                      SliverToBoxAdapter(
-                        child: MonthHeader(
-                          focusedMonth: focusedMonth,
-                          onPreviousMonth: _viewModel.previousMonth,
-                          onNextMonth: _viewModel.nextMonth,
-                          onToday: _viewModel.goToToday,
+        ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _showAddEventDialog(context),
+        icon: const Icon(Icons.add),
+        label: Text(l10n.newEvent),
+      ),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final horizontalPadding = constraints.maxWidth >= 600 ? 24.0 : 0.0;
+          return GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onHorizontalDragStart: _onHorizontalDragStart,
+            onHorizontalDragUpdate: _onHorizontalDragUpdate,
+            onHorizontalDragEnd: _onHorizontalDragEnd,
+            onHorizontalDragCancel: _onHorizontalDragCancel,
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+              child: CustomScrollView(
+                slivers: [
+                  // 1. Month Header (Previous / Next / Today)
+                  SliverToBoxAdapter(
+                    child: MonthHeader(
+                      focusedMonth: focusedMonth,
+                      onPreviousMonth: _viewModel.previousMonth,
+                      onNextMonth: _viewModel.nextMonth,
+                      onToday: _viewModel.goToToday,
+                    ),
+                  ),
+
+                  if (!_isAgendaView) ...[
+                    // 2. Weekday Header Row
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 10.0),
+                        child: Row(
+                          children: [
+                            if (showWeekNumbers)
+                              Expanded(
+                                child: Center(
+                                  child: Text(
+                                    l10n.weekNumberShort,
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                      color: theme.colorScheme.outline,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ...weekdayHeaders.map((day) {
+                              return Expanded(
+                                child: Center(
+                                  child: Text(
+                                    day,
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                      color: theme.colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }),
+                          ],
                         ),
                       ),
+                    ),
 
-                      if (!_isAgendaView) ...[
-                        // 2. Weekday Header Row
-                        SliverToBoxAdapter(
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10.0,
-                            ),
-                            child: Row(
-                              children: [
-                                if (showWeekNumbers)
-                                  Expanded(
-                                    child: Center(
-                                      child: Text(
-                                        l10n.weekNumberShort,
-                                        style: theme.textTheme.bodySmall
-                                            ?.copyWith(
-                                              fontWeight: FontWeight.bold,
-                                              color: theme.colorScheme.outline,
-                                              fontSize: 11,
-                                            ),
-                                      ),
-                                    ),
-                                  ),
-                                ...weekdayHeaders.map((day) {
-                                  return Expanded(
-                                    child: Center(
-                                      child: Text(
-                                        day,
-                                        style: theme.textTheme.bodySmall
-                                            ?.copyWith(
-                                              fontWeight: FontWeight.bold,
-                                              color: theme
-                                                  .colorScheme
-                                                  .onSurfaceVariant,
-                                            ),
-                                      ),
-                                    ),
-                                  );
-                                }),
-                              ],
-                            ),
-                          ),
+                    const SliverToBoxAdapter(child: SizedBox(height: 6)),
+
+                    // 3. Calendar Grid (7 columns, or 8 with week numbers)
+                    SliverPadding(
+                      padding: const EdgeInsets.symmetric(horizontal: 10.0),
+                      sliver: SliverGrid(
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: showWeekNumbers ? 8 : 7,
+                          childAspectRatio: showWeekNumbers ? 1.05 : 1.2,
                         ),
+                        delegate: SliverChildBuilderDelegate(
+                          (context, index) {
+                            if (showWeekNumbers) {
+                              final row = index ~/ 8;
+                              final col = index % 8;
 
-                        const SliverToBoxAdapter(child: SizedBox(height: 6)),
-
-                        // 3. Calendar Grid (7 columns, or 8 with week numbers)
-                        SliverPadding(
-                          padding: const EdgeInsets.symmetric(horizontal: 10.0),
-                          sliver: SliverGrid(
-                            gridDelegate:
-                                SliverGridDelegateWithFixedCrossAxisCount(
-                                  crossAxisCount: showWeekNumbers ? 8 : 7,
-                                  childAspectRatio: showWeekNumbers
-                                      ? 1.05
-                                      : 1.2,
-                                ),
-                            delegate: SliverChildBuilderDelegate(
-                              (context, index) {
-                                if (showWeekNumbers) {
-                                  final row = index ~/ 8;
-                                  final col = index % 8;
-
-                                  if (col == 0) {
-                                    final thursdayOffset =
-                                        firstDay == StartingDayOfWeek.sunday
-                                        ? 4
-                                        : (firstDay ==
-                                                  StartingDayOfWeek.saturday
-                                              ? 5
-                                              : 3);
-                                    final weekNumber = _getIsoWeekNumber(
-                                      gridDays[row * 7 + thursdayOffset],
-                                    );
-                                    return WeekNumberCell(
-                                      weekNumber: weekNumber,
-                                      tooltipBuilder: l10n.weekTooltip,
-                                    );
-                                  }
-
-                                  final dayIndex = row * 7 + (col - 1);
-                                  final date = gridDays[dayIndex];
-                                  return _buildDayCell(
-                                    date,
-                                    focusedMonth,
-                                    selectedDate,
-                                    today,
-                                  );
-                                }
-
-                                final date = gridDays[index];
-                                return _buildDayCell(
-                                  date,
-                                  focusedMonth,
-                                  selectedDate,
-                                  today,
+                              if (col == 0) {
+                                final thursdayOffset =
+                                    firstDay == StartingDayOfWeek.sunday
+                                    ? 4
+                                    : (firstDay == StartingDayOfWeek.saturday
+                                          ? 5
+                                          : 3);
+                                final weekNumber = _getIsoWeekNumber(
+                                  gridDays[row * 7 + thursdayOffset],
                                 );
-                              },
-                              childCount: showWeekNumbers
-                                  ? (gridDays.length ~/ 7) * 8
-                                  : gridDays.length,
-                            ),
-                          ),
-                        ),
+                                return WeekNumberCell(
+                                  weekNumber: weekNumber,
+                                  tooltipBuilder: l10n.weekTooltip,
+                                );
+                              }
 
-                        const SliverToBoxAdapter(child: Divider(height: 16)),
-
-                        // 4. Selected Date Summary Header
-                        SliverToBoxAdapter(
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16.0,
-                              vertical: 4.0,
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    DateFormat(
-                                      'EEEE, MMM d',
-                                      locale,
-                                    ).format(selectedDate),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: theme.textTheme.titleMedium
-                                        ?.copyWith(fontWeight: FontWeight.bold),
-                                  ),
-                                ),
-                                Text(
-                                  l10n.eventCount(events.length),
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    color: theme.colorScheme.primary,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-
-                        // 5. Daily Events List or Empty State
-                        if (events.isEmpty)
-                          SliverToBoxAdapter(
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                vertical: 24.0,
-                              ),
-                              child: Center(
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.event_available,
-                                      size: 40,
-                                      color: theme.colorScheme.outlineVariant,
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      l10n.noEventsScheduled,
-                                      style: theme.textTheme.bodyMedium
-                                          ?.copyWith(
-                                            color: theme.colorScheme.outline,
-                                          ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          )
-                        else
-                          SliverList.builder(
-                            itemCount: events.length,
-                            itemBuilder: (context, index) {
-                              final event = events[index];
-                              return EventTile(
-                                event: event,
-                                onDelete: () => _deleteEvent(event),
+                              final dayIndex = row * 7 + (col - 1);
+                              final date = gridDays[dayIndex];
+                              return _buildDayCell(
+                                date,
+                                focusedMonth,
+                                selectedDate,
+                                today,
                               );
-                            },
-                          ),
-                      ] else if (agendaEvents.isEmpty)
-                        SliverToBoxAdapter(
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 24.0),
-                            child: Center(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.event_available,
-                                    size: 40,
-                                    color: theme.colorScheme.outlineVariant,
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    l10n.noEventsScheduled,
-                                    style: theme.textTheme.bodyMedium?.copyWith(
-                                      color: theme.colorScheme.outline,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        )
-                      else
-                        for (final entry in agendaEvents.entries) ...[
-                          SliverToBoxAdapter(
-                            child: Padding(
-                              padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+                            }
+
+                            final date = gridDays[index];
+                            return _buildDayCell(
+                              date,
+                              focusedMonth,
+                              selectedDate,
+                              today,
+                            );
+                          },
+                          childCount: showWeekNumbers
+                              ? (gridDays.length ~/ 7) * 8
+                              : gridDays.length,
+                        ),
+                      ),
+                    ),
+
+                    const SliverToBoxAdapter(child: Divider(height: 16)),
+
+                    // 4. Selected Date Summary Header
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16.0,
+                          vertical: 4.0,
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
                               child: Text(
                                 DateFormat(
                                   'EEEE, MMM d',
                                   locale,
-                                ).format(entry.key),
+                                ).format(selectedDate),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                                 style: theme.textTheme.titleMedium?.copyWith(
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
                             ),
-                          ),
-                          SliverList.builder(
-                            itemCount: entry.value.length,
-                            itemBuilder: (context, index) {
-                              final event = entry.value[index];
-                              return EventTile(
-                                event: event,
-                                onDelete: () => _deleteEvent(event),
-                              );
-                            },
-                          ),
-                        ],
+                            Text(
+                              l10n.eventCount(events.length),
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.primary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
 
-                      // Bottom padding so content is never obscured by the FloatingActionButton
-                      const SliverToBoxAdapter(child: SizedBox(height: 80)),
+                    // 5. Daily Events List or Empty State
+                    if (events.isEmpty)
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 24.0),
+                          child: Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.event_available,
+                                  size: 40,
+                                  color: theme.colorScheme.outlineVariant,
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  l10n.noEventsScheduled,
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    color: theme.colorScheme.outline,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      )
+                    else
+                      SliverList.builder(
+                        itemCount: events.length,
+                        itemBuilder: (context, index) {
+                          final event = events[index];
+                          return EventTile(
+                            event: event,
+                            onDelete: () => _deleteEvent(event),
+                          );
+                        },
+                      ),
+                  ] else if (agendaEvents.isEmpty)
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 24.0),
+                        child: Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.event_available,
+                                size: 40,
+                                color: theme.colorScheme.outlineVariant,
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                l10n.noEventsScheduled,
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: theme.colorScheme.outline,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    )
+                  else
+                    for (final entry in agendaEvents.entries) ...[
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+                          child: Text(
+                            DateFormat('EEEE, MMM d', locale).format(entry.key),
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                      SliverList.builder(
+                        itemCount: entry.value.length,
+                        itemBuilder: (context, index) {
+                          final event = entry.value[index];
+                          return EventTile(
+                            event: event,
+                            onDelete: () => _deleteEvent(event),
+                          );
+                        },
+                      ),
                     ],
-                  ),
-                ),
-              );
-            },
-          ),
+
+                  // Bottom padding so content is never obscured by the FloatingActionButton
+                  const SliverToBoxAdapter(child: SizedBox(height: 80)),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
     );
   }
 }
@@ -741,6 +735,8 @@ class _AddEventBottomSheet extends StatefulWidget {
     required this.selectedDate,
     required this.initialCalendar,
     required this.initialCalendarDestination,
+    required this.localCalendars,
+    required this.categoriesForCalendar,
     required this.deviceCalendars,
     this.initialEvent,
     required this.onSave,
@@ -749,6 +745,8 @@ class _AddEventBottomSheet extends StatefulWidget {
   final DateTime selectedDate;
   final LocalCalendar initialCalendar;
   final String initialCalendarDestination;
+  final List<LocalCalendar> localCalendars;
+  final List<EventCategory> Function(String calendarId) categoriesForCalendar;
   final List<DeviceCalendarInfo> deviceCalendars;
   final ExternalCalendarEvent? initialEvent;
   final Future<void> Function({
@@ -757,6 +755,8 @@ class _AddEventBottomSheet extends StatefulWidget {
     required DateTime startTime,
     required DateTime endTime,
     required LocalCalendar calendar,
+    required String? categoryId,
+    required Color? categoryColor,
     required String? deviceCalendarId,
     required bool isAllDay,
   })
@@ -774,6 +774,7 @@ class _AddEventBottomSheetState extends State<_AddEventBottomSheet> {
   TimeOfDay _endTime = const TimeOfDay(hour: 10, minute: 0);
   bool _isAllDay = false;
   late String _selectedCalendarId;
+  String? _selectedCategoryId;
   bool _isSaving = false;
   String? _saveError;
   Animation<double>? _routeAnimation;
@@ -848,6 +849,16 @@ class _AddEventBottomSheetState extends State<_AddEventBottomSheet> {
       'EEEE, MMM d, yyyy',
       locale,
     ).format(widget.selectedDate);
+    final selectedLocalCalendar = _selectedCalendarId.startsWith('local:')
+        ? widget.localCalendars.firstWhere(
+            (calendar) =>
+                calendar.id == _selectedCalendarId.substring('local:'.length),
+            orElse: () => widget.initialCalendar,
+          )
+        : null;
+    final categories = selectedLocalCalendar == null
+        ? const <EventCategory>[]
+        : widget.categoriesForCalendar(selectedLocalCalendar.id);
 
     return Padding(
       padding: EdgeInsets.only(
@@ -902,14 +913,16 @@ class _AddEventBottomSheetState extends State<_AddEventBottomSheet> {
                 labelText: l10n.saveToCalendar,
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.calendar_month),
-                helperText: _selectedCalendarId == 'local:personal'
+                helperText: selectedLocalCalendar != null
                     ? l10n.savedLocallyOnDevice
                     : l10n.savedToDeviceCalendar,
               ),
               items: [
-                DropdownMenuItem(
-                  value: 'local:${LocalCalendar.personal.id}',
-                  child: Text(l10n.personalCalendar),
+                ...widget.localCalendars.map(
+                  (calendar) => DropdownMenuItem(
+                    value: 'local:${calendar.id}',
+                    child: Text(calendar.name),
+                  ),
                 ),
                 ...widget.deviceCalendars.map(
                   (calendar) => DropdownMenuItem(
@@ -928,10 +941,53 @@ class _AddEventBottomSheetState extends State<_AddEventBottomSheet> {
                   ? null
                   : (calendarId) {
                       if (calendarId != null) {
-                        setState(() => _selectedCalendarId = calendarId);
+                        setState(() {
+                          _selectedCalendarId = calendarId;
+                          _selectedCategoryId = null;
+                        });
                       }
                     },
             ),
+            if (selectedLocalCalendar != null && categories.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String?>(
+                key: ValueKey(
+                  'event-category-dropdown-${selectedLocalCalendar.id}',
+                ),
+                initialValue: _selectedCategoryId,
+                isExpanded: true,
+                decoration: InputDecoration(
+                  labelText: l10n.categoryName,
+                  border: const OutlineInputBorder(),
+                  prefixIcon: const Icon(Icons.label_outline),
+                ),
+                items: [
+                  DropdownMenuItem<String?>(
+                    value: null,
+                    child: Text(l10n.noCategory),
+                  ),
+                  ...categories.map(
+                    (category) => DropdownMenuItem<String?>(
+                      value: category.id,
+                      child: Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 7,
+                            backgroundColor: category.color,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(child: Text(category.name)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+                onChanged: _isSaving
+                    ? null
+                    : (categoryId) =>
+                          setState(() => _selectedCategoryId = categoryId),
+              ),
+            ],
             if (_saveError != null) ...[
               const SizedBox(height: 8),
               Text(
@@ -1014,6 +1070,13 @@ class _AddEventBottomSheetState extends State<_AddEventBottomSheet> {
                                 _endTime.hour,
                                 _endTime.minute,
                               );
+                        Color? selectedCategoryColor;
+                        for (final category in categories) {
+                          if (category.id == _selectedCategoryId) {
+                            selectedCategoryColor = category.color;
+                            break;
+                          }
+                        }
 
                         setState(() {
                           _isSaving = true;
@@ -1025,7 +1088,10 @@ class _AddEventBottomSheetState extends State<_AddEventBottomSheet> {
                             description: _descriptionController.text.trim(),
                             startTime: startDateTime,
                             endTime: endDateTime,
-                            calendar: LocalCalendar.personal,
+                            calendar:
+                                selectedLocalCalendar ?? widget.initialCalendar,
+                            categoryId: _selectedCategoryId,
+                            categoryColor: selectedCategoryColor,
                             deviceCalendarId:
                                 _selectedCalendarId.startsWith('device:')
                                 ? _selectedCalendarId.substring(

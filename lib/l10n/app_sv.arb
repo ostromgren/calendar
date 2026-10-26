@@ -20,10 +20,30 @@
   "forDate": "För {date}",
   "eventTitle": "Händelsens titel",
   "descriptionOptional": "Beskrivning (valfri)",
+  "expandDescription": "Visa hela beskrivningen",
+  "collapseDescription": "Fäll ihop beskrivningen",
   "saveToCalendar": "Spara i kalender",
   "savedLocallyOnDevice": "Sparas lokalt på den här enheten",
   "savedToDeviceCalendar": "Sparas i den valda synkroniserade kalendern",
   "personalCalendar": "Personligt",
+  "localCalendars": "Lokala kalendrar",
+  "localCalendarsDescription": "Hantera kalendrar, kategorier och färger",
+  "addLocalCalendar": "Lägg till lokal kalender",
+  "renameLocalCalendar": "Byt namn på kalender",
+  "addCategory": "Lägg till kategori",
+  "categoryName": "Kategorinamn",
+  "categoryColor": "Kategorifärg",
+  "name": "Namn",
+  "save": "Spara",
+  "localCalendarSaveError": "Det gick inte att spara kalenderinställningar: {error}",
+  "@localCalendarSaveError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "noCategory": "Ingen kategori",
   "startTime": "Start: {time}",
   "endTime": "Slut: {time}",
   "saveEvent": "Spara händelse",

@@ -1,27 +1,72 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_settings_root"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:background="#FFF8FAFC"
-    android:gravity="center_vertical"
+    android:layout_height="wrap_content"
+    android:minWidth="260dp"
+    android:background="@drawable/calendar_widget_configure_background"
     android:orientation="vertical"
-    android:padding="24dp">
+    android:padding="20dp">
 
-    <TextView
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <ImageView
+            android:id="@+id/widget_settings_icon"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="@drawable/calendar_widget_configure_icon_background"
+            android:contentDescription="@null"
+            android:padding="10dp"
+            android:src="@android:drawable/ic_menu_my_calendar"
+            android:tint="#FF2563EB"/>
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/widget_settings_title"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/calendar_widget_settings_title"
+                android:textColor="#FF1F2937"
+                android:textSize="18sp"
+                android:textStyle="bold"/>
+
+            <TextView
+                android:id="@+id/widget_settings_description"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/calendar_widget_settings_description"
+                android:textColor="#FF64748B"
+                android:textSize="13sp"/>
+        </LinearLayout>
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/widget_transparency_label"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="20dp"
         android:text="@string/calendar_widget_transparency"
         android:textColor="#FF1F2937"
-        android:textSize="20sp"
-        android:textStyle="bold"/>
+        android:textSize="14sp"
+        android:fontFamily="sans-serif-medium"/>
 
     <TextView
         android:id="@+id/widget_transparency_value"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:textColor="#FF475569"
-        android:textSize="14sp"/>
+        android:layout_marginTop="4dp"
+        android:textColor="#FF64748B"
+        android:textSize="13sp"/>
 
     <SeekBar
         android:id="@+id/widget_transparency_seekbar"
@@ -29,10 +74,29 @@
         android:layout_height="wrap_content"
         android:max="80"/>
 
-    <Button
-        android:id="@+id/widget_save"
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="20dp"
-        android:text="@string/calendar_widget_save"/>
+        android:layout_marginTop="12dp"
+        android:gravity="end|center_vertical"
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/widget_cancel"
+            style="?android:attr/buttonBarButtonStyle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/calendar_widget_cancel"
+            android:textColor="#FF2563EB"/>
+
+        <Button
+            android:id="@+id/widget_save"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:minWidth="88dp"
+            android:text="@string/calendar_widget_save"
+            android:textColor="#FFFFFFFF"
+            android:backgroundTint="#FF2563EB"/>
+    </LinearLayout>
 </LinearLayout>

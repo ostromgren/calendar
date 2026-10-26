@@ -1,7 +1,10 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:calendar/domain/models/app_language.dart';
 import 'package:calendar/domain/models/local_calendar.dart';
+import 'package:calendar/domain/models/event_category.dart';
 import 'package:calendar/domain/models/starting_day_of_week.dart';
 import 'package:calendar/ui/core/theme.dart';
 
@@ -16,6 +19,8 @@ abstract final class _Keys {
       'settings.last_used_calendar_destination';
   static const String appLanguage = 'settings.app_language';
   static const String deviceCalendarIds = 'settings.device_calendar_ids';
+  static const String localCalendars = 'settings.local_calendars';
+  static const String eventCategories = 'settings.event_categories';
 }
 
 /// Persists and retrieves user settings using [SharedPreferences].
@@ -113,9 +118,73 @@ class SettingsRepository {
   /// Returns the last-used local calendar, defaulting to Personal.
   LocalCalendar get lastUsedCalendar {
     final stored = _prefs.getString(_Keys.lastUsedCalendarId);
-    return stored == null
-        ? LocalCalendar.personal
-        : LocalCalendar.fromId(stored);
+    return localCalendars.firstWhere(
+      (calendar) => calendar.id == stored,
+      orElse: () => localCalendars.first,
+    );
+  }
+
+  /// Locally managed calendars, including the original Personal calendar.
+  List<LocalCalendar> get localCalendars {
+    final stored = _prefs.getString(_Keys.localCalendars);
+    if (stored == null) return [LocalCalendar.personal];
+    try {
+      final values = jsonDecode(stored) as List<dynamic>;
+      final calendars = values
+          .map((value) => LocalCalendar.fromJson(value as Map<String, dynamic>))
+          .toList(growable: false);
+      if (calendars.isNotEmpty &&
+          calendars.any((calendar) => calendar.id == 'personal')) {
+        return calendars;
+      }
+    } on FormatException catch (error) {
+      debugPrint('Could not decode local calendars: $error');
+    } on TypeError catch (error) {
+      debugPrint('Invalid local calendar data: $error');
+    }
+    return [LocalCalendar.personal];
+  }
+
+  /// Persists user-managed local calendars.
+  Future<void> saveLocalCalendars(Iterable<LocalCalendar> calendars) async {
+    if (!await _prefs.setString(
+      _Keys.localCalendars,
+      jsonEncode(calendars.map((calendar) => calendar.toJson()).toList()),
+    )) {
+      throw StateError('Could not save local calendars.');
+    }
+  }
+
+  /// User-created categories, optionally limited to one local calendar.
+  List<EventCategory> getEventCategories({String? calendarId}) {
+    final stored = _prefs.getString(_Keys.eventCategories);
+    if (stored == null) return const [];
+    try {
+      final values = jsonDecode(stored) as List<dynamic>;
+      final categories = values
+          .map((value) => EventCategory.fromJson(value as Map<String, dynamic>))
+          .toList(growable: false);
+      return calendarId == null
+          ? categories
+          : categories
+                .where((category) => category.calendarId == calendarId)
+                .toList(growable: false);
+    } on FormatException catch (error) {
+      debugPrint('Could not decode event categories: $error');
+    } on TypeError catch (error) {
+      debugPrint('Invalid event category data: $error');
+    }
+    return const [];
+  }
+
+  /// Persists user-created event categories.
+  Future<void> saveEventCategories(Iterable<EventCategory> categories) async {
+    if (!await _prefs.setString(
+      _Keys.eventCategories,
+      jsonEncode(categories.map((category) => category.toJson()).toList()),
+    )) {
+      throw StateError('Could not save event categories.');
+    }
   }
 
   /// The last event destination, or the legacy local-calendar preference.

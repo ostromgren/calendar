@@ -10,6 +10,7 @@ import 'package:calendar/l10n/generated/app_localizations.dart';
 import 'package:calendar/ui/features/calendar/calendar_greeting.dart';
 import 'package:calendar/ui/features/calendar/view_models/calendar_view_model.dart';
 import 'package:calendar/ui/features/settings/view_models/theme_view_model.dart';
+
 import 'test_app.dart';
 
 void main() {
@@ -144,6 +145,115 @@ void main() {
       findsOneWidget,
     );
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('event descriptions start collapsed and can be expanded', (
+    tester,
+  ) async {
+    final (viewModel, themeViewModel, settings) = await buildViewModels();
+    final description =
+        'Join the meeting: teams.example.com. ${'Additional notes. ' * 20}';
+    final now = DateTime.now();
+    viewModel.addEvent(
+      title: 'Long description event',
+      description: description,
+      startTime: DateTime(now.year, now.month, now.day, 9),
+      endTime: DateTime(now.year, now.month, now.day, 10),
+      calendar: viewModel.lastUsedCalendar,
+    );
+
+    await tester.pumpWidget(
+      createCalendarTestApp(
+        settingsRepository: settings,
+        calendarViewModel: viewModel,
+        themeViewModel: themeViewModel,
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text(description),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+
+    final descriptionText = find.text(description);
+    expect(tester.widget<Text>(descriptionText).maxLines, 2);
+    expect(
+      tester.widget<Text>(descriptionText).overflow,
+      TextOverflow.ellipsis,
+    );
+    final card = find.byKey(const ValueKey('event-tile-card'));
+    final marker = find.byKey(const ValueKey('event-color-marker'));
+    final deleteButton = find.byKey(const ValueKey('event-delete-button'));
+    final markerPosition = tester.getTopLeft(marker) - tester.getTopLeft(card);
+    final deletePosition =
+        tester.getTopLeft(deleteButton) - tester.getTopLeft(card);
+
+    await tester.tap(find.byTooltip('Show full description'));
+    await tester.pumpAndSettle();
+    expect(tester.widget<Text>(descriptionText).maxLines, isNull);
+    expect(tester.getTopLeft(marker) - tester.getTopLeft(card), markerPosition);
+    expect(
+      tester.getTopLeft(deleteButton) - tester.getTopLeft(card),
+      deletePosition,
+    );
+  });
+
+  testWidgets('event creation uses a local calendar category color', (
+    tester,
+  ) async {
+    final (viewModel, themeViewModel, settings) = await buildViewModels();
+    await viewModel.addLocalCalendar('Work');
+    final calendar = viewModel.localCalendars.last;
+    await viewModel.addEventCategory(
+      calendarId: calendar.id,
+      name: 'Meetings',
+      color: Colors.deepPurple,
+    );
+    final category = viewModel.categoriesFor(calendar.id).single;
+
+    await tester.pumpWidget(
+      createCalendarTestApp(
+        settingsRepository: settings,
+        calendarViewModel: viewModel,
+        themeViewModel: themeViewModel,
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('New Event'));
+    await tester.pumpAndSettle();
+
+    final calendarDropdown = find.byKey(
+      const ValueKey('event-calendar-dropdown'),
+    );
+    await tester.ensureVisible(calendarDropdown);
+    await tester.tap(calendarDropdown);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Work').last);
+    await tester.pumpAndSettle();
+
+    final categoryDropdown = find.byKey(
+      ValueKey('event-category-dropdown-${calendar.id}'),
+    );
+    await tester.ensureVisible(categoryDropdown);
+    await tester.tap(categoryDropdown);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Meetings').last);
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Event Title'),
+      'Project sync',
+    );
+    await tester.ensureVisible(find.text('Save Event'));
+    await tester.tap(find.text('Save Event'));
+    await tester.pumpAndSettle();
+
+    final event = viewModel.selectedDateEvents.single;
+    expect(event.title, 'Project sync');
+    expect(event.calendarId, calendar.id);
+    expect(event.categoryId, category.id);
+    expect(event.color.toARGB32(), Colors.deepPurple.toARGB32());
   });
 
   testWidgets(

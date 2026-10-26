@@ -15,4 +15,18 @@
     <style name="NormalTheme" parent="@android:style/Theme.Light.NoTitleBar">
         <item name="android:windowBackground">?android:colorBackground</item>
     </style>
+    <style name="WidgetConfigureTheme" parent="@android:style/Theme.Material.Light.Dialog.NoActionBar">
+        <item name="android:colorAccent">#2563EB</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowMinWidthMajor">0%</item>
+        <item name="android:windowMinWidthMinor">0%</item>
+        <item name="android:windowActionModeOverlay">true</item>
+    </style>
+    <style name="WidgetConfigureDarkTheme" parent="@android:style/Theme.Material.Dialog.NoActionBar">
+        <item name="android:colorAccent">#60A5FA</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowMinWidthMajor">0%</item>
+        <item name="android:windowMinWidthMinor">0%</item>
+        <item name="android:windowActionModeOverlay">true</item>
+    </style>
 </resources>

@@ -9,6 +9,7 @@ class DayCell extends StatelessWidget {
     required this.isToday,
     required this.isCurrentMonth,
     required this.hasEvents,
+    this.eventColors = const [],
     required this.onTap,
   });
 
@@ -17,6 +18,7 @@ class DayCell extends StatelessWidget {
   final bool isToday;
   final bool isCurrentMonth;
   final bool hasEvents;
+  final List<Color> eventColors;
   final VoidCallback onTap;
 
   @override
@@ -64,13 +66,31 @@ class DayCell extends StatelessWidget {
             const SizedBox(height: 2),
             // Event indicator dot
             if (hasEvents)
-              Container(
-                width: 5,
-                height: 5,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: isSelected ? colorScheme.onPrimary : colorScheme.primary,
-                ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  for (final color in eventColors.take(3))
+                    Container(
+                      width: 5,
+                      height: 5,
+                      margin: const EdgeInsets.symmetric(horizontal: 1),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: isSelected ? colorScheme.onPrimary : color,
+                      ),
+                    ),
+                  if (eventColors.isEmpty)
+                    Container(
+                      width: 5,
+                      height: 5,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: isSelected
+                            ? colorScheme.onPrimary
+                            : colorScheme.primary,
+                      ),
+                    ),
+                ],
               )
             else
               const SizedBox(height: 5),
