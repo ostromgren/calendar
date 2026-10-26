@@ -1,137 +1,76 @@
-# Calendar App (Flutter)
+# Calendar
 
-A cross-platform Calendar application built with Flutter and Dart.
+A cross-platform calendar application built with Flutter. View and manage events in a monthly calendar or agenda, organize local calendars, and connect events from calendars on your device.
 
----
+## Features
 
-## 📱 Platform Targets
+- Monthly calendar and agenda views
+- Create and manage events, including long descriptions that can be expanded when needed
+- Multiple local calendars with custom names and user-defined, color-coded categories
+- Read and write supported device calendars
+- Light, dark, system, curated, and custom app-wide color themes
+- Android and iOS widgets for upcoming events
+- Open `.ics` invitations in the app for review before saving
+- English and Swedish interface languages
 
-| Platform | Latest 2 Versions Supported | Targeted Version | Configuration File |
-| :--- | :--- | :--- | :--- |
-| **Android** | **Android 15** (API 35) & **Android 16** (API 36) | **Android 16** (API 36) | `android/app/build.gradle.kts` |
-| **iOS** | **iOS 26** & **iOS 27** (2026 versioning) | **iOS 27** (Deployment target 26.0+) | `ios/Runner.xcodeproj` / `ios/Podfile` |
-| **macOS** | Flutter desktop | Current macOS | `macos/Runner` |
-| **Windows** | Flutter desktop | Windows 10+ | `windows/runner` |
+Platform capabilities depend on the operating system and its calendar permissions.
 
----
+## Supported platforms
 
-## 🧱 Key Concepts
+The repository includes application targets for Android, iOS, macOS, and Windows. Each platform requires its corresponding Flutter-supported development toolchain. Some platform integrations, such as device calendars and widgets, are available only on supported platforms.
 
-### State Management
-The app uses Flutter's built-in [`ChangeNotifier`](lib/ui/features/calendar/view_models/calendar_view_model.dart) pattern:
-- **ViewModel** holds and mutates state, calling `notifyListeners()` after each change.
-- **View** wraps its build in `ListenableBuilder(listenable: viewModel, ...)` and rebuilds automatically.
+## Getting started
 
-### Layered Architecture
-| Layer | Responsibility |
-| :--- | :--- |
-| `domain/models/` | Immutable data classes with no framework dependencies |
-| `data/repositories/` | Single source of truth for reading and writing events |
-| `ui/features/*/view_models/` | UI state, user intent handlers, delegates to repository |
-| `ui/features/*/views/` | Stateless widgets that render ViewModel state |
-| `ui/core/` | Shared theme, colours, and typography |
+### Requirements
 
-### Native Platform Configuration
-| Concern | Android | iOS |
-| :--- | :--- | :--- |
-| Build config | `android/app/build.gradle.kts` | `ios/Runner.xcodeproj` / `ios/Podfile` |
-| App metadata & permissions | `android/app/src/main/AndroidManifest.xml` | `ios/Runner/Info.plist` |
-| Native entry point | `android/.../MainActivity.kt` | `ios/Runner/AppDelegate.swift` |
-| App bundle identifier | `applicationId` in `build.gradle.kts` | `PRODUCT_BUNDLE_IDENTIFIER` in Xcode |
-| Icons & splash assets | `android/app/src/main/res/mipmap-*/` | `ios/Runner/Assets.xcassets` |
+- Flutter SDK compatible with the constraints in `pubspec.yaml`
+- Platform-specific build tools for the target platform (for example, Xcode for iOS and macOS)
 
-### Opening calendar events from other apps
+### Set up and run
 
-Android advertises support for the standard calendar event insertion intent and
-for opening `.ics` files. iOS and macOS register `.ics` as an alternate file
-type, so the OS can offer Calendar when opening an invite. Incoming invites
-open prefilled in the event form for review before saving.
-
-Windows builds receive `.ics` file paths when launched by the OS. To add the
-app to the Windows **Open with** list, run the bundled
-`register_calendar_association.ps1` from PowerShell after installing the app.
-The script registers the current user's file association without changing the
-default `.ics` application.
-
----
-
-## 🏗️ Architecture
-
-The codebase adheres to the recommended layered approach:
-
-```text
-lib/
-├── data/
-│   └── repositories/
-│       └── calendar_repository.dart    # Event persistence & CRUD (single source of truth)
-├── domain/
-│   └── models/
-│       └── calendar_event.dart         # Immutable event model
-├── ui/
-│   ├── core/
-│   │   └── theme.dart                  # Material 3 light/dark theme definitions
-│   └── features/
-│       └── calendar/
-│           ├── view_models/
-│           │   └── calendar_view_model.dart # State management (ChangeNotifier)
-│           └── views/
-│               ├── calendar_view.dart       # Main calendar screen (Slivers)
-│               └── widgets/
-│                   ├── day_cell.dart        # Day cell in monthly grid
-│                   ├── event_tile.dart      # Daily event list item
-│                   └── month_header.dart    # Month navigation controls
-└── main.dart                                # Dependency wiring & runApp()
+```sh
+flutter pub get
+flutter run
 ```
 
----
+To select a specific simulator, emulator, or desktop target:
 
-## 🚀 Running the Project
+```sh
+flutter devices
+flutter run -d <device-id>
+```
 
-### 1. Run Unit & Widget Tests
-```bash
+## Development
+
+Run the test suite and static analysis with:
+
+```sh
 flutter test
-```
-
-### 2. Run Static Analyzer
-```bash
 flutter analyze
 ```
 
-### 3. Run on Chrome (Instant testing without mobile simulators)
-```bash
-flutter run -d chrome
+Generate localization code after editing the files in `lib/l10n/`:
+
+```sh
+flutter gen-l10n
 ```
 
-### 4. Run on Android
-```bash
-flutter run -d android
+## Project structure
+
+```text
+lib/
+├── data/       Data access, repositories, and platform integrations
+├── domain/     Calendar, event, and settings models
+├── l10n/       English and Swedish localization resources
+└── ui/
+    ├── core/   Shared theme and presentation utilities
+    └── features/
+        ├── calendar/
+        └── settings/
 ```
 
-### 5. Install a release-mode build on Android
-Connect your Samsung with USB debugging enabled, then find its Flutter device ID:
-```bash
-flutter devices
-flutter run --release -d <device-id>
-```
+The application separates data access, domain models, and feature-specific UI. View models hold presentation state and coordinate updates with repositories.
 
-This builds and installs the optimized release-mode app directly on the phone.
-The current Android release build uses the local debug signing key for personal
-testing; configure a private release keystore before distributing the APK.
+## Contributing
 
-### 6. Run on iOS Simulator
-```bash
-open -a Simulator
-flutter run -d iPhone
-```
-
----
-
-## ⚡ Tooling & Environment Next Steps
-
-1. **Flutter CLI**: Added to `~/.zshrc` (`export PATH="$HOME/flutter/bin:$PATH"`).
-2. **JDK & Android SDK (CLI-only)**: Install **JDK 21 (LTS)** and **Android Command-Line Tools** via Homebrew (`brew install openjdk@21 && brew install --cask android-commandlinetools`). Use the modern `android sdk` CLI (`android sdk install "platforms;android-36" ...`) to manage packages.
-3. **iOS Toolchain**: Install Xcode from the Mac App Store, then run:
-   ```bash
-   sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer
-   sudo xcodebuild -runFirstLaunch
-   ```
+Contributions are welcome. Please include or update tests for behavior changes and run `flutter test` and `flutter analyze` before submitting a pull request.

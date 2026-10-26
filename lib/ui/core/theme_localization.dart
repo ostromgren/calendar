@@ -10,6 +10,7 @@ extension AppThemeTypeLocalization on AppThemeType {
     AppThemeType.sunsetAmber => l10n.sunsetAmberTheme,
     AppThemeType.deepPurple => l10n.deepPurpleTheme,
     AppThemeType.roseCrimson => l10n.roseCrimsonTheme,
+    AppThemeType.custom => l10n.advancedColor,
   };
 
   String localizedSubtitle(AppLocalizations l10n) => switch (this) {
@@ -19,5 +20,6 @@ extension AppThemeTypeLocalization on AppThemeType {
     AppThemeType.sunsetAmber => l10n.sunsetAmberDescription,
     AppThemeType.deepPurple => l10n.deepPurpleDescription,
     AppThemeType.roseCrimson => l10n.roseCrimsonDescription,
+    AppThemeType.custom => l10n.advancedColorDescription,
   };
 }

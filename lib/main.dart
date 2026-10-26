@@ -36,8 +36,8 @@ void main(List<String> arguments) async {
 
 /// Root widget of the application.
 ///
-/// Wraps [MaterialApp] in [DynamicColorBuilder] so Android 12+ wallpaper and
-/// palette colors are made available to [AppTheme.createTheme].
+/// Wraps [MaterialApp] in [DynamicColorBuilder] so platform-provided dynamic
+/// colors are made available to [AppTheme.createTheme].
 class CalendarApp extends ConsumerWidget {
   const CalendarApp({super.key});
 
@@ -50,16 +50,17 @@ class CalendarApp extends ConsumerWidget {
           brightness: Brightness.light,
           themeType: themeViewModel.currentTheme,
           dynamicColorScheme: lightDynamic,
+          customSeedColor: themeViewModel.customThemeColor,
         );
         final darkTheme = AppTheme.createTheme(
           brightness: Brightness.dark,
           themeType: themeViewModel.currentTheme,
           dynamicColorScheme: darkDynamic,
+          customSeedColor: themeViewModel.customThemeColor,
         );
 
         return MaterialApp(
-          onGenerateTitle: (context) =>
-              AppLocalizations.of(context)!.appTitle,
+          onGenerateTitle: (context) => AppLocalizations.of(context)!.appTitle,
           debugShowCheckedModeBanner: false,
           theme: lightTheme,
           darkTheme: darkTheme,

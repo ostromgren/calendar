@@ -11,6 +11,7 @@ import 'package:calendar/ui/core/theme.dart';
 /// Keys used to store settings in [SharedPreferences].
 abstract final class _Keys {
   static const String themeType = 'settings.theme_type';
+  static const String customThemeColor = 'settings.custom_theme_color';
   static const String themeMode = 'settings.theme_mode';
   static const String firstDayOfWeek = 'settings.first_day_of_week';
   static const String showWeekNumbers = 'settings.show_week_numbers';
@@ -57,6 +58,14 @@ class SettingsRepository {
   /// Persists [value] as the active theme type.
   Future<void> saveThemeType(AppThemeType value) =>
       _prefs.setString(_Keys.themeType, value.name);
+
+  /// Returns the custom theme seed color, defaulting to the standard blue.
+  Color get customThemeColor =>
+      Color(_prefs.getInt(_Keys.customThemeColor) ?? 0xFF2563EB);
+
+  /// Persists the selected custom theme seed color.
+  Future<void> saveCustomThemeColor(Color color) =>
+      _prefs.setInt(_Keys.customThemeColor, color.toARGB32());
 
   // ---------------------------------------------------------------------------
   // Theme mode

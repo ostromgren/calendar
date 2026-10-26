@@ -2,13 +2,12 @@ import 'package:flutter/material.dart';
 
 /// Available themes in the calendar application.
 ///
-/// Includes 5 curated Material 3 themes plus 1 dynamic theme
-/// for Android 12+ (which extracts the system color palette and wallpaper tones).
+/// Includes 5 curated Material 3 themes and a dynamic system theme.
 enum AppThemeType {
-  /// The special Android theme that follows system wallpaper and palette settings.
+  /// Follows the system color palette when the platform provides one.
   systemDynamic(
-    title: 'System Palette (Material You)',
-    subtitle: 'Follows Android wallpaper & system color palette',
+    title: 'System Palette',
+    subtitle: 'Follows the system color palette when available',
     seedColor: Color(0xFF2563EB),
     isDynamic: true,
     icon: Icons.auto_awesome_rounded,
@@ -57,6 +56,15 @@ enum AppThemeType {
     seedColor: Color(0xFFE11D48),
     isDynamic: false,
     icon: Icons.favorite_border_rounded,
+  ),
+
+  /// User-defined Material 3 theme generated from a custom seed color.
+  custom(
+    title: 'Custom Color',
+    subtitle: 'Use a color you choose throughout the app',
+    seedColor: Color(0xFF2563EB),
+    isDynamic: false,
+    icon: Icons.color_lens_outlined,
   );
 
   const AppThemeType({
@@ -77,7 +85,7 @@ enum AppThemeType {
 /// App theme configuration using modern Material 3.
 ///
 /// Supports curated color seeds as well as dynamic platform color schemes
-/// (Material You on Android 12+).
+/// when supported by the current platform.
 class AppTheme {
   /// Builds a [ThemeData] instance for the requested [themeType] and [brightness].
   ///
@@ -88,14 +96,20 @@ class AppTheme {
     required Brightness brightness,
     required AppThemeType themeType,
     ColorScheme? dynamicColorScheme,
+    Color? customSeedColor,
   }) {
     final ColorScheme colorScheme;
     if (themeType == AppThemeType.systemDynamic && dynamicColorScheme != null) {
       colorScheme = dynamicColorScheme;
     } else {
       colorScheme = ColorScheme.fromSeed(
-        seedColor: themeType.seedColor,
+        seedColor: themeType == AppThemeType.custom
+            ? customSeedColor ?? themeType.seedColor
+            : themeType.seedColor,
         brightness: brightness,
+        dynamicSchemeVariant: themeType == AppThemeType.custom
+            ? DynamicSchemeVariant.fidelity
+            : DynamicSchemeVariant.tonalSpot,
       );
     }
 
@@ -121,22 +135,20 @@ class AppTheme {
       ),
       floatingActionButtonTheme: FloatingActionButtonThemeData(
         elevation: 2,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       ),
     );
   }
 
   /// Default light theme (for backwards compatibility).
   static ThemeData get lightTheme => createTheme(
-        brightness: Brightness.light,
-        themeType: AppThemeType.oceanBlue,
-      );
+    brightness: Brightness.light,
+    themeType: AppThemeType.oceanBlue,
+  );
 
   /// Default dark theme (for backwards compatibility).
   static ThemeData get darkTheme => createTheme(
-        brightness: Brightness.dark,
-        themeType: AppThemeType.oceanBlue,
-      );
+    brightness: Brightness.dark,
+    themeType: AppThemeType.oceanBlue,
+  );
 }

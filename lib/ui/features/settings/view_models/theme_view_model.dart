@@ -16,16 +16,19 @@ class ThemeViewModel extends ChangeNotifier {
     ThemeMode? initialThemeMode,
   }) : _settings = settingsRepository,
        _currentTheme = initialTheme ?? settingsRepository.themeType,
+       _customThemeColor = settingsRepository.customThemeColor,
        _themeMode = initialThemeMode ?? settingsRepository.themeMode,
        _appLanguage = settingsRepository.appLanguage;
 
   final SettingsRepository _settings;
   AppThemeType _currentTheme;
+  Color _customThemeColor;
   ThemeMode _themeMode;
   AppLanguage _appLanguage;
 
   /// The currently selected app theme.
   AppThemeType get currentTheme => _currentTheme;
+  Color get customThemeColor => _customThemeColor;
 
   /// The active theme mode (system, light, or dark).
   ThemeMode get themeMode => _themeMode;
@@ -41,6 +44,16 @@ class ThemeViewModel extends ChangeNotifier {
     if (_currentTheme != theme) {
       _currentTheme = theme;
       _settings.saveThemeType(theme);
+      notifyListeners();
+    }
+  }
+
+  void setCustomThemeColor(Color color) {
+    if (_customThemeColor != color || _currentTheme != AppThemeType.custom) {
+      _customThemeColor = color;
+      _currentTheme = AppThemeType.custom;
+      _settings.saveCustomThemeColor(color);
+      _settings.saveThemeType(AppThemeType.custom);
       notifyListeners();
     }
   }

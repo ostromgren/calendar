@@ -13,6 +13,8 @@ import 'package:calendar/ui/features/settings/view_models/theme_view_model.dart'
 import 'package:calendar/ui/features/settings/views/settings_view.dart';
 import 'package:calendar/ui/features/calendar/views/widgets/week_number_cell.dart';
 import 'package:calendar/ui/features/settings/views/theme_selection_view.dart';
+import 'package:calendar/ui/features/settings/views/advanced_color_picker_view.dart';
+
 import 'test_app.dart';
 
 void main() {
@@ -168,9 +170,9 @@ void main() {
         expect(find.text('Live Preview'), findsOneWidget);
         expect(find.text('Brightness'), findsOneWidget);
 
-        // Verify dynamic Android theme card is displayed
-        expect(find.text('System Palette (Material You)'), findsOneWidget);
-        expect(find.text('Android Material You'), findsOneWidget);
+        // Verify the system theme is platform-neutral.
+        expect(find.text('System Palette'), findsOneWidget);
+        expect(find.textContaining('Android'), findsNothing);
 
         // Verify all 5 curated themes are displayed
         expect(find.text('Ocean Blue'), findsOneWidget);
@@ -215,10 +217,10 @@ void main() {
 
       expect(themeViewModel.currentTheme, AppThemeType.sunsetAmber);
 
-      // Select back to 'System Palette (Material You)'
-      await tester.ensureVisible(find.text('System Palette (Material You)'));
+      // Select back to the system palette.
+      await tester.ensureVisible(find.text('System Palette'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('System Palette (Material You)'));
+      await tester.tap(find.text('System Palette'));
       await tester.pumpAndSettle();
 
       expect(themeViewModel.currentTheme, AppThemeType.systemDynamic);
@@ -260,6 +262,122 @@ void main() {
 
       expect(themeViewModel.themeMode, ThemeMode.system);
     });
+
+    testWidgets(
+      'Advanced color picker applies and persists custom theme color',
+      (tester) async {
+        themeViewModel.setCustomThemeColor(const Color(0xFF797979));
+        await tester.pumpWidget(
+          createCalendarTestApp(
+            settingsRepository: settingsRepository,
+            calendarViewModel: calendarViewModel,
+            themeViewModel: themeViewModel,
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(
+          tester
+              .widget<MaterialApp>(find.byType(MaterialApp))
+              .theme!
+              .colorScheme
+              .primary,
+          AppTheme.createTheme(
+            brightness: Brightness.light,
+            themeType: AppThemeType.custom,
+            customSeedColor: const Color(0xFF797979),
+          ).colorScheme.primary,
+        );
+        await tester.tap(find.byTooltip('Settings'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.widgetWithText(ListTile, 'Themes'));
+        await tester.pumpAndSettle();
+
+        final advancedOption = find.byKey(
+          const ValueKey('advanced-color-option'),
+        );
+        await tester.drag(find.byType(ListView).last, const Offset(0, -500));
+        await tester.pumpAndSettle();
+        await tester.tap(advancedOption);
+        await tester.pumpAndSettle();
+        expect(find.byType(AdvancedColorPickerView), findsOneWidget);
+
+        final hexField = find.byKey(const ValueKey('custom-color-hex'));
+        final grayPreview = tester.widget<FilledButton>(
+          find.byKey(const ValueKey('custom-color-preview-button')),
+        );
+        expect(
+          grayPreview.style!.backgroundColor!.resolve({}),
+          AppTheme.createTheme(
+            brightness: Brightness.light,
+            themeType: AppThemeType.custom,
+            customSeedColor: const Color(0xFF797979),
+          ).colorScheme.primary,
+        );
+        final ringRect = tester.getRect(
+          find.byKey(const ValueKey('custom-color-hue-ring')),
+        );
+        await tester.tapAt(
+          Offset(ringRect.center.dx, ringRect.top + ringRect.height * 0.05),
+        );
+        await tester.pump();
+        final hueSelection = tester
+            .widget<TextField>(hexField)
+            .controller!
+            .text
+            .substring(1);
+        final hueColor = Color(int.parse('FF$hueSelection', radix: 16));
+        expect(HSVColor.fromColor(hueColor).hue, closeTo(0, 1));
+        expect(HSVColor.fromColor(hueColor).saturation, greaterThan(0.7));
+
+        await tester.enterText(hexField, '#E91E63');
+        await tester.pump();
+        expect(find.byType(AdvancedColorPickerView), findsOneWidget);
+        final previewButton = tester.widget<FilledButton>(
+          find.byKey(const ValueKey('custom-color-preview-button')),
+        );
+        expect(
+          previewButton.style!.backgroundColor!.resolve({}),
+          AppTheme.createTheme(
+            brightness: Brightness.light,
+            themeType: AppThemeType.custom,
+            customSeedColor: const Color(0xFFE91E63),
+          ).colorScheme.primary,
+        );
+        final applyButton = find.byKey(const ValueKey('apply-custom-color'));
+        tester.testTextInput.hide();
+        await tester.pumpAndSettle();
+        await tester.drag(find.byType(ListView).last, const Offset(0, -500));
+        await tester.pumpAndSettle();
+        expect(applyButton, findsOneWidget);
+        await tester.tap(applyButton);
+        await tester.pumpAndSettle();
+
+        expect(themeViewModel.currentTheme, AppThemeType.custom);
+        expect(themeViewModel.customThemeColor, const Color(0xFFE91E63));
+        expect(settingsRepository.themeType, AppThemeType.custom);
+        expect(settingsRepository.customThemeColor, const Color(0xFFE91E63));
+        expect(
+          tester
+              .widget<MaterialApp>(find.byType(MaterialApp))
+              .theme!
+              .colorScheme
+              .primary,
+          AppTheme.createTheme(
+            brightness: Brightness.light,
+            themeType: AppThemeType.custom,
+            customSeedColor: const Color(0xFFE91E63),
+          ).colorScheme.primary,
+        );
+        expect(
+          AppTheme.createTheme(
+            brightness: Brightness.light,
+            themeType: themeViewModel.currentTheme,
+            customSeedColor: themeViewModel.customThemeColor,
+          ).colorScheme.primary,
+          isNot(const Color(0xFF2563EB)),
+        );
+      },
+    );
 
     testWidgets(
       'Changing First Day of Week in SettingsView updates calendar grid and headers',

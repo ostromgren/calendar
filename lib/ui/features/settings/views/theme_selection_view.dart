@@ -5,10 +5,11 @@ import 'package:calendar/l10n/generated/app_localizations.dart';
 import '../../../../providers.dart';
 import '../../../core/theme.dart';
 import '../../../core/theme_localization.dart';
+import 'advanced_color_picker_view.dart';
 
 /// Screen allowing the user to select their calendar theme and brightness mode.
 ///
-/// Features 5 curated themes plus Android 12+ dynamic system palette support.
+/// Features curated themes and a dynamic system palette option.
 class ThemeSelectionView extends ConsumerWidget {
   const ThemeSelectionView({super.key});
 
@@ -252,6 +253,55 @@ class ThemeSelectionView extends ConsumerWidget {
 
                     const SizedBox(height: 24),
 
+                    Text(
+                      l10n.advancedColor,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: colorScheme.primary,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Card(
+                      elevation: currentTheme == AppThemeType.custom ? 1 : 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: BorderSide(
+                          color: currentTheme == AppThemeType.custom
+                              ? colorScheme.primary
+                              : colorScheme.outlineVariant,
+                          width: currentTheme == AppThemeType.custom ? 2 : 1,
+                        ),
+                      ),
+                      child: ListTile(
+                        key: const ValueKey('advanced-color-option'),
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (context) =>
+                                const AdvancedColorPickerView(),
+                          ),
+                        ),
+                        leading: CircleAvatar(
+                          backgroundColor: themeViewModel.customThemeColor,
+                          child: const Icon(
+                            Icons.color_lens_outlined,
+                            color: Colors.white,
+                          ),
+                        ),
+                        title: Text(l10n.advancedColor),
+                        subtitle: Text(l10n.advancedColorDescription),
+                        trailing: Icon(
+                          currentTheme == AppThemeType.custom
+                              ? Icons.check_circle
+                              : Icons.chevron_right,
+                          color: currentTheme == AppThemeType.custom
+                              ? colorScheme.primary
+                              : null,
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 24),
+
                     // Curated App Themes Header
                     Text(
                       l10n.curatedColorThemes,
@@ -261,15 +311,16 @@ class ThemeSelectionView extends ConsumerWidget {
                       ),
                     ),
                     const SizedBox(height: 8),
-                    ...AppThemeType.values.where((t) => !t.isDynamic).map((
-                      themeOption,
-                    ) {
-                      return _CuratedThemeTile(
-                        themeType: themeOption,
-                        isSelected: currentTheme == themeOption,
-                        onSelect: () => themeViewModel.setTheme(themeOption),
-                      );
-                    }),
+                    ...AppThemeType.values
+                        .where((t) => !t.isDynamic && t != AppThemeType.custom)
+                        .map((themeOption) {
+                          return _CuratedThemeTile(
+                            themeType: themeOption,
+                            isSelected: currentTheme == themeOption,
+                            onSelect: () =>
+                                themeViewModel.setTheme(themeOption),
+                          );
+                        }),
                   ],
                 ),
               ),
@@ -324,7 +375,7 @@ class ThemeSelectionView extends ConsumerWidget {
   }
 }
 
-/// Special card for the Android 12+ Dynamic Color / Material You theme.
+/// Card for the dynamic system color theme.
 class _DynamicThemeCard extends StatelessWidget {
   const _DynamicThemeCard({
     required this.themeType,
@@ -390,23 +441,6 @@ class _DynamicThemeCard extends StatelessWidget {
                               themeType.localizedTitle(l10n),
                               style: theme.textTheme.titleMedium?.copyWith(
                                 fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: colorScheme.secondaryContainer,
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                l10n.androidMaterialYou,
-                                style: theme.textTheme.labelSmall?.copyWith(
-                                  color: colorScheme.onSecondaryContainer,
-                                  fontWeight: FontWeight.w600,
-                                ),
                               ),
                             ),
                           ],
