@@ -9,6 +9,7 @@ import 'package:calendar/domain/models/app_language.dart';
 import 'package:calendar/l10n/generated/app_localizations.dart';
 import 'package:calendar/ui/features/calendar/calendar_greeting.dart';
 import 'package:calendar/ui/features/calendar/view_models/calendar_view_model.dart';
+import 'package:calendar/domain/models/recurrence_frequency.dart';
 import 'package:calendar/ui/features/settings/view_models/theme_view_model.dart';
 
 import 'test_app.dart';
@@ -25,6 +26,39 @@ void main() {
     final themeViewModel = ThemeViewModel(settingsRepository: settings);
     return (viewModel, themeViewModel, settings);
   }
+
+  testWidgets('event title is required before saving', (tester) async {
+    final (viewModel, themeViewModel, settings) = await buildViewModels();
+
+    await tester.pumpWidget(
+      createCalendarTestApp(
+        settingsRepository: settings,
+        calendarViewModel: viewModel,
+        themeViewModel: themeViewModel,
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('New Event'));
+    await tester.pumpAndSettle();
+
+    final saveButton = find.widgetWithText(FilledButton, 'Save Event');
+    expect(find.text('Required'), findsOneWidget);
+    expect(tester.widget<FilledButton>(saveButton).onPressed, isNull);
+
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Event Title'),
+      '   ',
+    );
+    await tester.pump();
+    expect(tester.widget<FilledButton>(saveButton).onPressed, isNull);
+
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Event Title'),
+      'Planning',
+    );
+    await tester.pump();
+    expect(tester.widget<FilledButton>(saveButton).onPressed, isNotNull);
+  });
 
   testWidgets('Calendar app renders header, grid, and event button', (
     tester,
@@ -154,7 +188,7 @@ void main() {
     final description =
         'Join the meeting: teams.example.com. ${'Additional notes. ' * 20}';
     final now = DateTime.now();
-    viewModel.addEvent(
+    await viewModel.addEvent(
       title: 'Long description event',
       description: description,
       startTime: DateTime(now.year, now.month, now.day, 9),
@@ -241,19 +275,61 @@ void main() {
     await tester.tap(find.text('Meetings').last);
     await tester.pumpAndSettle();
 
+    final recurrenceDropdown = find.byKey(
+      const ValueKey('event-recurrence-dropdown'),
+    );
+    await tester.ensureVisible(recurrenceDropdown);
+    await tester.tap(recurrenceDropdown);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Every 2 weeks').last);
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('recurrence-end-date-button')),
+      findsOneWidget,
+    );
+
     await tester.enterText(
       find.widgetWithText(TextField, 'Event Title'),
       'Project sync',
+    );
+    await tester.pump();
+    expect(
+      tester
+          .widget<FilledButton>(find.widgetWithText(FilledButton, 'Save Event'))
+          .onPressed,
+      isNotNull,
     );
     await tester.ensureVisible(find.text('Save Event'));
     await tester.tap(find.text('Save Event'));
     await tester.pumpAndSettle();
 
-    final event = viewModel.selectedDateEvents.single;
+    final event = viewModel.repository.getAllEvents().single;
     expect(event.title, 'Project sync');
     expect(event.calendarId, calendar.id);
     expect(event.categoryId, category.id);
     expect(event.color.toARGB32(), Colors.deepPurple.toARGB32());
+    expect(event.recurrenceFrequency, RecurrenceFrequency.everyTwoWeeks);
+    expect(event.recurrenceEndDate, isNotNull);
+
+    await tester.scrollUntilVisible(
+      find.text('Project sync'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.byKey(const ValueKey('event-delete-button')).last);
+    await tester.pumpAndSettle();
+    expect(find.text('Delete recurring event?'), findsOneWidget);
+    expect(find.text('This event only'), findsOneWidget);
+    expect(find.text('Entire series'), findsOneWidget);
+    await tester.tap(find.text('This event only'));
+    await tester.pumpAndSettle();
+    expect(viewModel.selectedDateEvents, isEmpty);
+    expect(viewModel.repository.getAllEvents(), hasLength(1));
+    expect(viewModel.repository.getAllEvents().single.excludedOccurrenceDates, [
+      viewModel.repository.getAllEvents().single.occurrenceDateKey(
+        event.startTime,
+      ),
+    ]);
   });
 
   testWidgets(
@@ -287,6 +363,7 @@ void main() {
         find.widgetWithText(TextField, 'Event Title'),
         'All-day appointment',
       );
+      await tester.pump();
       await tester.ensureVisible(find.text('Save Event'));
       await tester.tap(find.text('Save Event'));
       await tester.pumpAndSettle();

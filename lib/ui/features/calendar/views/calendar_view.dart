@@ -12,6 +12,7 @@ import '../../../../domain/models/event_category.dart';
 import '../../settings/view_models/device_calendars_view_model.dart';
 import '../../settings/views/settings_view.dart';
 import '../../../../domain/models/local_calendar.dart';
+import '../../../../domain/models/recurrence_frequency.dart';
 import '../calendar_greeting.dart';
 import '../view_models/calendar_view_model.dart';
 import 'widgets/day_cell.dart';
@@ -127,7 +128,7 @@ class _CalendarViewState extends ConsumerState<CalendarView>
     final end = DateTime(month.year, month.month + 1);
     final events =
         [
-          ..._viewModel.repository.getAllEvents(),
+          ..._viewModel.repository.getEventsBetween(start, end),
           ..._deviceCalendarsViewModel.events,
         ]..removeWhere(
           (event) =>
@@ -348,9 +349,11 @@ class _CalendarViewState extends ConsumerState<CalendarView>
                 required Color? categoryColor,
                 required String? deviceCalendarId,
                 required bool isAllDay,
+                required RecurrenceFrequency? recurrenceFrequency,
+                required DateTime? recurrenceEndDate,
               }) async {
                 if (deviceCalendarId == null) {
-                  _viewModel.addEvent(
+                  await _viewModel.addEvent(
                     title: title,
                     description: description,
                     startTime: startTime,
@@ -359,6 +362,8 @@ class _CalendarViewState extends ConsumerState<CalendarView>
                     categoryId: categoryId,
                     categoryColor: categoryColor,
                     isAllDay: isAllDay,
+                    recurrenceFrequency: recurrenceFrequency,
+                    recurrenceEndDate: recurrenceEndDate,
                   );
                 } else {
                   await calendarsViewModel.createEvent(
@@ -379,6 +384,7 @@ class _CalendarViewState extends ConsumerState<CalendarView>
 
   Future<void> _deleteEvent(CalendarEvent event) async {
     final l10n = AppLocalizations.of(context)!;
+    var deleteSeries = false;
     if (event.isDeviceCalendarEvent) {
       final shouldDelete = await showDialog<bool>(
         context: context,
@@ -398,13 +404,39 @@ class _CalendarViewState extends ConsumerState<CalendarView>
         ),
       );
       if (shouldDelete != true) return;
+    } else if (_viewModel.repository.isRecurringOccurrence(event.id)) {
+      final deleteChoice = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Text(l10n.deleteRecurringEventTitle),
+          content: Text(l10n.deleteRecurringEventConfirmation),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(null),
+              child: Text(l10n.cancel),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: Text(l10n.deleteThisEventOnly),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: Text(l10n.deleteEntireSeries),
+            ),
+          ],
+        ),
+      );
+      if (deleteChoice == null) return;
+      deleteSeries = deleteChoice;
     }
 
     try {
       if (event.isDeviceCalendarEvent) {
         await _deviceCalendarsViewModel.deleteEvent(event.id);
+      } else if (deleteSeries) {
+        await _viewModel.deleteEventSeries(event.id);
       } else {
-        _viewModel.deleteEvent(event.id);
+        await _viewModel.deleteEvent(event.id);
       }
     } catch (error) {
       if (mounted) {
@@ -759,6 +791,8 @@ class _AddEventBottomSheet extends StatefulWidget {
     required Color? categoryColor,
     required String? deviceCalendarId,
     required bool isAllDay,
+    required RecurrenceFrequency? recurrenceFrequency,
+    required DateTime? recurrenceEndDate,
   })
   onSave;
 
@@ -773,6 +807,8 @@ class _AddEventBottomSheetState extends State<_AddEventBottomSheet> {
   TimeOfDay _startTime = const TimeOfDay(hour: 9, minute: 0);
   TimeOfDay _endTime = const TimeOfDay(hour: 10, minute: 0);
   bool _isAllDay = false;
+  RecurrenceFrequency? _recurrenceFrequency;
+  DateTime? _recurrenceEndDate;
   late String _selectedCalendarId;
   String? _selectedCategoryId;
   bool _isSaving = false;
@@ -889,8 +925,10 @@ class _AddEventBottomSheetState extends State<_AddEventBottomSheet> {
             TextField(
               controller: _titleController,
               focusNode: _titleFocusNode,
+              onChanged: (_) => setState(() {}),
               decoration: InputDecoration(
                 labelText: l10n.eventTitle,
+                helperText: l10n.required,
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.event),
               ),
@@ -944,6 +982,10 @@ class _AddEventBottomSheetState extends State<_AddEventBottomSheet> {
                         setState(() {
                           _selectedCalendarId = calendarId;
                           _selectedCategoryId = null;
+                          if (calendarId.startsWith('device:')) {
+                            _recurrenceFrequency = null;
+                            _recurrenceEndDate = null;
+                          }
                         });
                       }
                     },
@@ -987,6 +1029,74 @@ class _AddEventBottomSheetState extends State<_AddEventBottomSheet> {
                     : (categoryId) =>
                           setState(() => _selectedCategoryId = categoryId),
               ),
+            ],
+            if (selectedLocalCalendar != null) ...[
+              const SizedBox(height: 12),
+              DropdownButtonFormField<RecurrenceFrequency?>(
+                key: const ValueKey('event-recurrence-dropdown'),
+                initialValue: _recurrenceFrequency,
+                isExpanded: true,
+                decoration: InputDecoration(
+                  labelText: l10n.recurrence,
+                  border: const OutlineInputBorder(),
+                ),
+                items: [
+                  DropdownMenuItem<RecurrenceFrequency?>(
+                    value: null,
+                    child: Text(l10n.noRecurrence),
+                  ),
+                  ...RecurrenceFrequency.values.map(
+                    (frequency) => DropdownMenuItem<RecurrenceFrequency?>(
+                      value: frequency,
+                      child: Text(_recurrenceLabel(l10n, frequency)),
+                    ),
+                  ),
+                ],
+                onChanged: _isSaving
+                    ? null
+                    : (frequency) {
+                        setState(() {
+                          _recurrenceFrequency = frequency;
+                          _recurrenceEndDate = frequency == null
+                              ? null
+                              : _recurrenceEndDate ??
+                                    DateTime(
+                                      widget.selectedDate.year + 1,
+                                      widget.selectedDate.month,
+                                      widget.selectedDate.day,
+                                    );
+                        });
+                      },
+              ),
+              if (_recurrenceFrequency != null) ...[
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  key: const ValueKey('recurrence-end-date-button'),
+                  icon: const Icon(Icons.event_available),
+                  label: Text(
+                    l10n.recurrenceEndDate(
+                      DateFormat.yMMMd(locale).format(_recurrenceEndDate!),
+                    ),
+                  ),
+                  onPressed: _isSaving
+                      ? null
+                      : () async {
+                          final selected = await showDatePicker(
+                            context: context,
+                            initialDate: _recurrenceEndDate!,
+                            firstDate: DateTime(
+                              widget.selectedDate.year,
+                              widget.selectedDate.month,
+                              widget.selectedDate.day,
+                            ),
+                            lastDate: DateTime(2100),
+                          );
+                          if (selected != null) {
+                            setState(() => _recurrenceEndDate = selected);
+                          }
+                        },
+                ),
+              ],
             ],
             if (_saveError != null) ...[
               const SizedBox(height: 8),
@@ -1047,7 +1157,7 @@ class _AddEventBottomSheetState extends State<_AddEventBottomSheet> {
             SizedBox(
               width: double.infinity,
               child: FilledButton(
-                onPressed: _isSaving
+                onPressed: _isSaving || _titleController.text.trim().isEmpty
                     ? null
                     : () async {
                         final title = _titleController.text.trim();
@@ -1099,6 +1209,8 @@ class _AddEventBottomSheetState extends State<_AddEventBottomSheet> {
                                   )
                                 : null,
                             isAllDay: _isAllDay,
+                            recurrenceFrequency: _recurrenceFrequency,
+                            recurrenceEndDate: _recurrenceEndDate,
                           );
                           if (!mounted) return;
                           navigator.pop();
@@ -1118,4 +1230,14 @@ class _AddEventBottomSheetState extends State<_AddEventBottomSheet> {
       ),
     );
   }
+
+  String _recurrenceLabel(
+    AppLocalizations l10n,
+    RecurrenceFrequency frequency,
+  ) => switch (frequency) {
+    RecurrenceFrequency.weekly => l10n.weekly,
+    RecurrenceFrequency.everyTwoWeeks => l10n.everyTwoWeeks,
+    RecurrenceFrequency.everyThreeWeeks => l10n.everyThreeWeeks,
+    RecurrenceFrequency.monthly => l10n.monthly,
+  };
 }

@@ -251,8 +251,26 @@ class ThemeSelectionView extends ConsumerWidget {
                           themeViewModel.setTheme(AppThemeType.systemDynamic),
                     ),
 
+                    // Curated App Themes Header
+                    Text(
+                      l10n.curatedColorThemes,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: colorScheme.primary,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    ...AppThemeType.values
+                        .where((t) => !t.isDynamic && t != AppThemeType.custom)
+                        .map((themeOption) {
+                          return _CuratedThemeTile(
+                            themeType: themeOption,
+                            isSelected: currentTheme == themeOption,
+                            onSelect: () =>
+                                themeViewModel.setTheme(themeOption),
+                          );
+                        }),
                     const SizedBox(height: 24),
-
                     Text(
                       l10n.advancedColor,
                       style: theme.textTheme.titleSmall?.copyWith(
@@ -299,28 +317,6 @@ class ThemeSelectionView extends ConsumerWidget {
                         ),
                       ),
                     ),
-
-                    const SizedBox(height: 24),
-
-                    // Curated App Themes Header
-                    Text(
-                      l10n.curatedColorThemes,
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: colorScheme.primary,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    ...AppThemeType.values
-                        .where((t) => !t.isDynamic && t != AppThemeType.custom)
-                        .map((themeOption) {
-                          return _CuratedThemeTile(
-                            themeType: themeOption,
-                            isSelected: currentTheme == themeOption,
-                            onSelect: () =>
-                                themeViewModel.setTheme(themeOption),
-                          );
-                        }),
                   ],
                 ),
               ),

@@ -18,7 +18,9 @@ final calendarIntentServiceProvider = Provider<CalendarIntentService?>(
 );
 
 final calendarRepositoryProvider = Provider<CalendarRepository>(
-  (ref) => CalendarRepository(),
+  (ref) => CalendarRepository(
+    initialEvents: ref.watch(settingsRepositoryProvider).localEvents,
+  ),
 );
 
 final deviceCalendarRepositoryProvider = Provider<DeviceCalendarRepository>(

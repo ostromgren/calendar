@@ -180,6 +180,12 @@ void main() {
         expect(find.text('Sunset Amber'), findsOneWidget);
         expect(find.text('Deep Purple'), findsOneWidget);
         expect(find.text('Rose Crimson'), findsOneWidget);
+        expect(
+          tester
+              .getTopLeft(find.byKey(const ValueKey('advanced-color-option')))
+              .dy,
+          greaterThan(tester.getTopLeft(find.text('Rose Crimson')).dy),
+        );
       },
     );
 
@@ -295,7 +301,7 @@ void main() {
         final advancedOption = find.byKey(
           const ValueKey('advanced-color-option'),
         );
-        await tester.drag(find.byType(ListView).last, const Offset(0, -500));
+        await tester.ensureVisible(advancedOption);
         await tester.pumpAndSettle();
         await tester.tap(advancedOption);
         await tester.pumpAndSettle();

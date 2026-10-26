@@ -19,6 +19,14 @@
   "addEvent": "Lägg till händelse",
   "forDate": "För {date}",
   "eventTitle": "Händelsens titel",
+  "required": "Obligatorisk",
+  "recurrence": "Upprepa",
+  "noRecurrence": "Upprepas inte",
+  "weekly": "Varje vecka",
+  "everyTwoWeeks": "Varannan vecka",
+  "everyThreeWeeks": "Var tredje vecka",
+  "monthly": "Varje månad",
+  "recurrenceEndDate": "Slutar {date}",
   "descriptionOptional": "Beskrivning (valfri)",
   "expandDescription": "Visa hela beskrivningen",
   "collapseDescription": "Fäll ihop beskrivningen",
@@ -30,6 +38,45 @@
   "localCalendarsDescription": "Hantera kalendrar, kategorier och färger",
   "addLocalCalendar": "Lägg till lokal kalender",
   "renameLocalCalendar": "Byt namn på kalender",
+  "deleteLocalCalendar": "Ta bort kalender",
+  "deleteLocalCalendarTitle": "Ta bort lokal kalender?",
+  "deleteLocalCalendarConfirmation": "Ta bort {calendarName} och alla dess händelser och kategorier?",
+  "@deleteLocalCalendarConfirmation": {
+    "placeholders": {
+      "calendarName": {
+        "type": "String"
+      }
+    }
+  },
+  "deleteCategoryTitle": "Ta bort kategori?",
+  "deleteCategory": "Ta bort kategori",
+  "deleteCategoryConfirmation": "Ta bort {categoryName}? Händelserna behålls men blir okategoriserade.",
+  "@deleteCategoryConfirmation": {
+    "placeholders": {
+      "categoryName": {
+        "type": "String"
+      }
+    }
+  },
+  "delete": "Ta bort",
+  "importCalendar": "Importera kalender (.ics)",
+  "exportCalendar": "Exportera kalender",
+  "calendarImportSuccess": "Kalendern har importerats: {name}",
+  "@calendarImportSuccess": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "calendarTransferError": "Kalenderöverföringen misslyckades: {error}",
+  "@calendarTransferError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "addCategory": "Lägg till kategori",
   "categoryName": "Kategorinamn",
   "categoryColor": "Kategorifärg",
@@ -51,6 +98,10 @@
   "invalidCalendarFile": "Inga kalenderhändelser hittades i den valda filen.",
   "calendarFileReadError": "Det gick inte att läsa den valda kalenderfilen: {error}",
   "deleteEvent": "Ta bort händelse",
+  "deleteRecurringEventTitle": "Ta bort återkommande händelse?",
+  "deleteRecurringEventConfirmation": "Välj om bara den här förekomsten eller hela serien ska tas bort.",
+  "deleteThisEventOnly": "Bara den här händelsen",
+  "deleteEntireSeries": "Hela serien",
   "deleteSyncedEventTitle": "Ta bort synkroniserad händelse?",
   "deleteSyncedEventConfirmation": "Händelsen tas bort från den valda kalendern och kan även tas bort från det synkroniserade kontot.",
   "cancel": "Avbryt",
@@ -97,7 +148,7 @@
   "showWeekNumbers": "Visa veckonummer",
   "weekNumbersDescription": "Visa veckonummer vid kalenderns rader",
   "about": "Om",
-  "versionInfo": "Version 1.0.0 • Material 3 och dynamiska färger",
+  "versionInfo": "Version 1.0.0",
   "livePreview": "Förhandsvisning",
   "brightness": "Ljusstyrka",
   "systemBrightness": "System",

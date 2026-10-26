@@ -34,6 +34,21 @@
     }
   },
   "eventTitle": "Event Title",
+  "required": "Required",
+  "recurrence": "Repeat",
+  "noRecurrence": "Does not repeat",
+  "weekly": "Every week",
+  "everyTwoWeeks": "Every 2 weeks",
+  "everyThreeWeeks": "Every 3 weeks",
+  "monthly": "Every month",
+  "recurrenceEndDate": "Ends on {date}",
+  "@recurrenceEndDate": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
   "descriptionOptional": "Description (optional)",
   "expandDescription": "Show full description",
   "collapseDescription": "Collapse description",
@@ -45,6 +60,45 @@
   "localCalendarsDescription": "Manage calendars, categories, and colors",
   "addLocalCalendar": "Add local calendar",
   "renameLocalCalendar": "Rename calendar",
+  "deleteLocalCalendar": "Delete calendar",
+  "deleteLocalCalendarTitle": "Delete local calendar?",
+  "deleteLocalCalendarConfirmation": "Delete {calendarName} and all of its events and categories?",
+  "@deleteLocalCalendarConfirmation": {
+    "placeholders": {
+      "calendarName": {
+        "type": "String"
+      }
+    }
+  },
+  "deleteCategoryTitle": "Delete category?",
+  "deleteCategory": "Delete category",
+  "deleteCategoryConfirmation": "Delete {categoryName}? Events using this category will remain but become uncategorized.",
+  "@deleteCategoryConfirmation": {
+    "placeholders": {
+      "categoryName": {
+        "type": "String"
+      }
+    }
+  },
+  "delete": "Delete",
+  "importCalendar": "Import calendar (.ics)",
+  "exportCalendar": "Export calendar",
+  "calendarImportSuccess": "Imported calendar: {name}",
+  "@calendarImportSuccess": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "calendarTransferError": "Calendar transfer failed: {error}",
+  "@calendarTransferError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "addCategory": "Add category",
   "categoryName": "Category name",
   "categoryColor": "Category color",
@@ -87,6 +141,10 @@
     }
   },
   "deleteEvent": "Delete event",
+  "deleteRecurringEventTitle": "Delete recurring event?",
+  "deleteRecurringEventConfirmation": "Choose whether to remove only this occurrence or the entire series.",
+  "deleteThisEventOnly": "This event only",
+  "deleteEntireSeries": "Entire series",
   "deleteSyncedEventTitle": "Delete synced event?",
   "deleteSyncedEventConfirmation": "This event will be removed from the selected calendar and may also be deleted from its synced account.",
   "cancel": "Cancel",
@@ -133,7 +191,7 @@
   "showWeekNumbers": "Show Week Numbers",
   "weekNumbersDescription": "Display week indicators on calendar rows",
   "about": "About",
-  "versionInfo": "Version 1.0.0 • Material 3 & Dynamic Color",
+  "versionInfo": "Version 1.0.0",
   "livePreview": "Live Preview",
   "brightness": "Brightness",
   "systemBrightness": "System",

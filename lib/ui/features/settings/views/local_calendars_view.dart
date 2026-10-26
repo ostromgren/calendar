@@ -1,13 +1,22 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
+import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path/path.dart' as p;
+import 'package:share_plus/share_plus.dart';
 import 'package:calendar/domain/models/event_category.dart';
 import 'package:calendar/domain/models/local_calendar.dart';
 import 'package:calendar/l10n/generated/app_localizations.dart';
 
+import '../../../../data/calendar_ics_service.dart';
 import '../../../../providers.dart';
 
 class LocalCalendarsView extends ConsumerWidget {
   const LocalCalendarsView({super.key});
+
+  static const _icsService = CalendarIcsService();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -23,6 +32,13 @@ class LocalCalendarsView extends ConsumerWidget {
             icon: const Icon(Icons.add),
             label: Text(l10n.addLocalCalendar),
           ),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            key: const ValueKey('import-local-calendar'),
+            onPressed: () => _importCalendar(context, ref),
+            icon: const Icon(Icons.file_open_outlined),
+            label: Text(l10n.importCalendar),
+          ),
           const SizedBox(height: 12),
           for (final calendar in viewModel.localCalendars)
             _CalendarCard(
@@ -30,10 +46,90 @@ class LocalCalendarsView extends ConsumerWidget {
               categories: viewModel.categoriesFor(calendar.id),
               onRename: () => _renameCalendar(context, ref, calendar),
               onAddCategory: () => _addCategory(context, ref, calendar),
+              onExport: () => _exportCalendar(context, ref, calendar),
+              onDelete: viewModel.localCalendars.length > 1
+                  ? () => _confirmDeleteCalendar(context, ref, calendar)
+                  : null,
+              onDeleteCategory: (category) =>
+                  _confirmDeleteCategory(context, ref, category),
             ),
         ],
       ),
     );
+  }
+
+  Future<void> _importCalendar(BuildContext context, WidgetRef ref) async {
+    final l10n = AppLocalizations.of(context)!;
+    try {
+      final file = await openFile(
+        acceptedTypeGroups: const [
+          XTypeGroup(
+            label: 'iCalendar',
+            extensions: ['ics'],
+            mimeTypes: ['text/calendar'],
+            uniformTypeIdentifiers: ['com.apple.ical.ics'],
+          ),
+        ],
+      );
+      if (file == null || !context.mounted) return;
+      final contents = await file.readAsString();
+      if (!context.mounted) return;
+      final imported = _icsService.importCalendar(contents);
+      final name = imported.name?.trim().isNotEmpty == true
+          ? imported.name!.trim()
+          : p.basenameWithoutExtension(file.name);
+      await ref
+          .read(calendarViewModelProvider)
+          .importLocalCalendar(name: name, imported: imported);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.calendarImportSuccess(name))),
+        );
+      }
+    } catch (error) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.calendarTransferError(error.toString()))),
+        );
+      }
+    }
+  }
+
+  Future<void> _exportCalendar(
+    BuildContext context,
+    WidgetRef ref,
+    LocalCalendar calendar,
+  ) async {
+    final l10n = AppLocalizations.of(context)!;
+    try {
+      final viewModel = ref.read(calendarViewModelProvider);
+      final contents = _icsService.exportCalendar(
+        name: calendar.name,
+        calendarId: calendar.id,
+        events: viewModel.repository.getAllEvents(),
+        categories: viewModel.categoriesFor(calendar.id),
+      );
+      final box = context.findRenderObject()! as RenderBox;
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [
+            XFile.fromData(
+              Uint8List.fromList(utf8.encode(contents)),
+              mimeType: 'text/calendar',
+              name: p.basename('${calendar.name}.ics'),
+            ),
+          ],
+          subject: calendar.name,
+          sharePositionOrigin: box.localToGlobal(Offset.zero) & box.size,
+        ),
+      );
+    } catch (error) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.calendarTransferError(error.toString()))),
+        );
+      }
+    }
   }
 
   Future<void> _addCalendar(BuildContext context, WidgetRef ref) async {
@@ -65,6 +161,70 @@ class LocalCalendarsView extends ConsumerWidget {
       () => ref
           .read(calendarViewModelProvider)
           .renameLocalCalendar(calendar.id, name),
+    );
+  }
+
+  Future<void> _confirmDeleteCalendar(
+    BuildContext context,
+    WidgetRef ref,
+    LocalCalendar calendar,
+  ) async {
+    final l10n = AppLocalizations.of(context)!;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(l10n.deleteLocalCalendarTitle),
+        content: Text(l10n.deleteLocalCalendarConfirmation(calendar.name)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(l10n.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(l10n.delete),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+    await _runSettingsAction(
+      context,
+      l10n,
+      () =>
+          ref.read(calendarViewModelProvider).deleteLocalCalendar(calendar.id),
+    );
+  }
+
+  Future<void> _confirmDeleteCategory(
+    BuildContext context,
+    WidgetRef ref,
+    EventCategory category,
+  ) async {
+    final l10n = AppLocalizations.of(context)!;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(l10n.deleteCategoryTitle),
+        content: Text(l10n.deleteCategoryConfirmation(category.name)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(l10n.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(l10n.delete),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+    await _runSettingsAction(
+      context,
+      l10n,
+      () =>
+          ref.read(calendarViewModelProvider).deleteEventCategory(category.id),
     );
   }
 
@@ -126,12 +286,18 @@ class _CalendarCard extends StatelessWidget {
     required this.categories,
     required this.onRename,
     required this.onAddCategory,
+    required this.onExport,
+    required this.onDelete,
+    required this.onDeleteCategory,
   });
 
   final LocalCalendar calendar;
   final List<EventCategory> categories;
   final VoidCallback onRename;
   final VoidCallback onAddCategory;
+  final VoidCallback onExport;
+  final VoidCallback? onDelete;
+  final ValueChanged<EventCategory> onDeleteCategory;
 
   @override
   Widget build(BuildContext context) {
@@ -147,10 +313,28 @@ class _CalendarCard extends StatelessWidget {
               contentPadding: EdgeInsets.zero,
               leading: const Icon(Icons.calendar_month_outlined),
               title: Text(calendar.name),
-              trailing: IconButton(
-                tooltip: l10n.renameLocalCalendar,
-                onPressed: onRename,
-                icon: const Icon(Icons.edit_outlined),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    key: ValueKey('export-calendar-${calendar.id}'),
+                    tooltip: l10n.exportCalendar,
+                    onPressed: onExport,
+                    icon: const Icon(Icons.ios_share_outlined),
+                  ),
+                  IconButton(
+                    tooltip: l10n.renameLocalCalendar,
+                    onPressed: onRename,
+                    icon: const Icon(Icons.edit_outlined),
+                  ),
+                  if (onDelete case final delete?)
+                    IconButton(
+                      key: ValueKey('delete-calendar-${calendar.id}'),
+                      tooltip: l10n.deleteLocalCalendar,
+                      onPressed: delete,
+                      icon: const Icon(Icons.delete_outline),
+                    ),
+                ],
               ),
             ),
             if (categories.isNotEmpty)
@@ -160,8 +344,12 @@ class _CalendarCard extends StatelessWidget {
                 children: [
                   for (final category in categories)
                     Chip(
+                      key: ValueKey('category-chip-${category.id}'),
                       avatar: CircleAvatar(backgroundColor: category.color),
                       label: Text(category.name),
+                      deleteIcon: const Icon(Icons.close),
+                      deleteButtonTooltipMessage: l10n.deleteCategory,
+                      onDeleted: () => onDeleteCategory(category),
                     ),
                 ],
               ),

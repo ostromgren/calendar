@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:calendar/domain/models/app_language.dart';
 import 'package:calendar/domain/models/local_calendar.dart';
 import 'package:calendar/domain/models/event_category.dart';
+import 'package:calendar/domain/models/calendar_event.dart';
 import 'package:calendar/domain/models/starting_day_of_week.dart';
 import 'package:calendar/ui/core/theme.dart';
 
@@ -22,6 +23,7 @@ abstract final class _Keys {
   static const String deviceCalendarIds = 'settings.device_calendar_ids';
   static const String localCalendars = 'settings.local_calendars';
   static const String eventCategories = 'settings.event_categories';
+  static const String localEvents = 'settings.local_events';
 }
 
 /// Persists and retrieves user settings using [SharedPreferences].
@@ -142,8 +144,7 @@ class SettingsRepository {
       final calendars = values
           .map((value) => LocalCalendar.fromJson(value as Map<String, dynamic>))
           .toList(growable: false);
-      if (calendars.isNotEmpty &&
-          calendars.any((calendar) => calendar.id == 'personal')) {
+      if (calendars.isNotEmpty) {
         return calendars;
       }
     } on FormatException catch (error) {
@@ -193,6 +194,33 @@ class SettingsRepository {
       jsonEncode(categories.map((category) => category.toJson()).toList()),
     )) {
       throw StateError('Could not save event categories.');
+    }
+  }
+
+  /// Locally stored events, excluding events from synced device calendars.
+  List<CalendarEvent> get localEvents {
+    final stored = _prefs.getString(_Keys.localEvents);
+    if (stored == null) return const [];
+    try {
+      final values = jsonDecode(stored) as List<dynamic>;
+      return values
+          .map((value) => CalendarEvent.fromJson(value as Map<String, dynamic>))
+          .toList(growable: false);
+    } on FormatException catch (error) {
+      debugPrint('Could not decode local events: $error');
+    } on TypeError catch (error) {
+      debugPrint('Invalid local event data: $error');
+    }
+    return const [];
+  }
+
+  /// Persists events in app-managed local calendars.
+  Future<void> saveLocalEvents(Iterable<CalendarEvent> events) async {
+    if (!await _prefs.setString(
+      _Keys.localEvents,
+      jsonEncode(events.map((event) => event.toJson()).toList()),
+    )) {
+      throw StateError('Could not save local calendar events.');
     }
   }
 

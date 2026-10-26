@@ -4,7 +4,9 @@ import 'package:calendar/data/repositories/settings_repository.dart';
 import 'package:calendar/domain/models/calendar_event.dart';
 import 'package:calendar/domain/models/event_category.dart';
 import 'package:calendar/domain/models/local_calendar.dart';
+import 'package:calendar/domain/models/recurrence_frequency.dart';
 import 'package:calendar/domain/models/starting_day_of_week.dart';
+import 'package:calendar/data/calendar_ics_service.dart';
 
 export 'package:calendar/domain/models/starting_day_of_week.dart';
 
@@ -78,6 +80,56 @@ class CalendarViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> importLocalCalendar({
+    required String name,
+    required ImportedCalendar imported,
+  }) async {
+    final normalizedName = name.trim();
+    if (normalizedName.isEmpty) {
+      throw ArgumentError.value(name, 'name', 'Calendar name cannot be empty.');
+    }
+    final calendarId = 'local-${DateTime.now().microsecondsSinceEpoch}';
+    final calendar = LocalCalendar(id: calendarId, name: normalizedName);
+    final importedCategories = imported.categories
+        .map(
+          (category) => EventCategory(
+            id: '$calendarId-${category.id}',
+            calendarId: calendarId,
+            name: category.name,
+            color: category.color,
+          ),
+        )
+        .toList(growable: false);
+    final categoryIds = {
+      for (var index = 0; index < imported.categories.length; index++)
+        imported.categories[index].id: importedCategories[index].id,
+    };
+    final events = imported.events
+        .map(
+          (event) => event.copyWith(
+            id: '$calendarId-${event.id}',
+            calendarId: calendarId,
+            categoryId: event.categoryId == null
+                ? null
+                : categoryIds[event.categoryId],
+          ),
+        )
+        .toList(growable: false);
+    final calendars = [..._localCalendars, calendar];
+    final categories = [..._eventCategories, ...importedCategories];
+    final allEvents = [...repository.getAllEvents(), ...events];
+
+    await _settings.saveLocalCalendars(calendars);
+    await _settings.saveEventCategories(categories);
+    await _settings.saveLocalEvents(allEvents);
+    for (final event in events) {
+      repository.addEvent(event);
+    }
+    _localCalendars = calendars;
+    _eventCategories = categories;
+    notifyListeners();
+  }
+
   Future<void> renameLocalCalendar(String id, String name) async {
     final normalizedName = name.trim();
     if (normalizedName.isEmpty) {
@@ -95,6 +147,38 @@ class CalendarViewModel extends ChangeNotifier {
     if (_lastUsedCalendar.id == id) {
       _lastUsedCalendar = calendars.firstWhere((calendar) => calendar.id == id);
     }
+    notifyListeners();
+  }
+
+  Future<void> deleteLocalCalendar(String id) async {
+    if (_localCalendars.length <= 1) {
+      throw StateError('At least one local calendar must remain.');
+    }
+    final calendar = _localCalendars.where((item) => item.id == id);
+    if (calendar.isEmpty) return;
+
+    final calendars = _localCalendars
+        .where((item) => item.id != id)
+        .toList(growable: false);
+    final categories = _eventCategories
+        .where((category) => category.calendarId != id)
+        .toList(growable: false);
+    final events = repository
+        .getAllEvents()
+        .where((event) => event.calendarId != id)
+        .toList(growable: false);
+    final deletedLastUsed = _lastUsedCalendar.id == id;
+
+    await _settings.saveLocalCalendars(calendars);
+    await _settings.saveEventCategories(categories);
+    await _settings.saveLocalEvents(events);
+    if (deletedLastUsed) {
+      await _settings.saveLastUsedCalendar(calendars.first);
+      _lastUsedCalendar = calendars.first;
+    }
+    _localCalendars = calendars;
+    _eventCategories = categories;
+    repository.replaceAllEvents(events);
     notifyListeners();
   }
 
@@ -116,6 +200,29 @@ class CalendarViewModel extends ChangeNotifier {
     final categories = [..._eventCategories, category];
     await _settings.saveEventCategories(categories);
     _eventCategories = categories;
+    notifyListeners();
+  }
+
+  Future<void> deleteEventCategory(String categoryId) async {
+    final category = _eventCategories.where((item) => item.id == categoryId);
+    if (category.isEmpty) return;
+
+    final categories = _eventCategories
+        .where((item) => item.id != categoryId)
+        .toList(growable: false);
+    final events = repository
+        .getAllEvents()
+        .map(
+          (event) => event.categoryId == categoryId
+              ? event.copyWith(clearCategoryId: true)
+              : event,
+        )
+        .toList(growable: false);
+
+    await _settings.saveEventCategories(categories);
+    await _settings.saveLocalEvents(events);
+    _eventCategories = categories;
+    repository.replaceAllEvents(events);
     notifyListeners();
   }
 
@@ -178,7 +285,7 @@ class CalendarViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  void addEvent({
+  Future<void> addEvent({
     required String title,
     required String description,
     required DateTime startTime,
@@ -187,7 +294,9 @@ class CalendarViewModel extends ChangeNotifier {
     String? categoryId,
     Color? categoryColor,
     bool isAllDay = false,
-  }) {
+    RecurrenceFrequency? recurrenceFrequency,
+    DateTime? recurrenceEndDate,
+  }) async {
     final newEvent = CalendarEvent(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       title: title,
@@ -198,15 +307,38 @@ class CalendarViewModel extends ChangeNotifier {
       endTime: endTime,
       isAllDay: isAllDay,
       color: categoryColor ?? Colors.blue,
+      recurrenceFrequency: recurrenceFrequency,
+      recurrenceEndDate: recurrenceEndDate,
     );
     repository.addEvent(newEvent);
+    try {
+      await _settings.saveLocalEvents(repository.getAllEvents());
+    } catch (_) {
+      repository.deleteEvent(newEvent.id);
+      rethrow;
+    }
     _lastUsedCalendar = calendar;
-    _settings.saveLastUsedCalendar(calendar);
+    await _settings.saveLastUsedCalendar(calendar);
     notifyListeners();
   }
 
-  void deleteEvent(String id) {
-    repository.deleteEvent(id);
+  Future<void> deleteEvent(String id) async {
+    await _deleteEvent(id, repository.deleteEvent);
+  }
+
+  Future<void> deleteEventSeries(String id) async {
+    await _deleteEvent(id, repository.deleteEventSeries);
+  }
+
+  Future<void> _deleteEvent(String id, bool Function(String) remove) async {
+    final previousEvents = repository.getAllEvents();
+    if (!remove(id)) return;
+    try {
+      await _settings.saveLocalEvents(repository.getAllEvents());
+    } catch (_) {
+      repository.replaceAllEvents(previousEvents);
+      rethrow;
+    }
     notifyListeners();
   }
 }

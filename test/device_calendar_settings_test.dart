@@ -10,6 +10,7 @@ import 'package:calendar/ui/features/calendar/view_models/calendar_view_model.da
 import 'package:calendar/ui/features/settings/view_models/device_calendars_view_model.dart';
 import 'package:calendar/ui/features/settings/view_models/theme_view_model.dart';
 import 'package:calendar/ui/features/settings/views/device_calendars_view.dart';
+
 import 'test_app.dart';
 
 class _FakeDeviceCalendarRepository implements DeviceCalendarRepository {

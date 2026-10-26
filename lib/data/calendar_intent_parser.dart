@@ -1,4 +1,5 @@
 import 'package:calendar/domain/models/external_calendar_event.dart';
+import 'package:calendar/domain/models/recurrence_frequency.dart';
 
 /// Parses common RFC 5545 event fields used when opening an .ics invite.
 List<ExternalCalendarEvent> parseCalendarFile(String contents) {
@@ -50,7 +51,21 @@ ExternalCalendarEvent? _parseEvent(Map<String, String> properties) {
   final allDay = rawStart.length == 8;
   final rawEnd = properties['DTEND'];
   final parsedEnd = rawEnd == null ? null : _parseDate(rawEnd);
-  final end = allDay ? start : parsedEnd ?? start.add(const Duration(hours: 1));
+  final end = allDay
+      ? parsedEnd ?? start.add(const Duration(days: 1))
+      : parsedEnd ?? start.add(const Duration(hours: 1));
+  final recurrence = _parseRecurrence(properties['RRULE']);
+  final excludedDates = (properties['EXDATE'] ?? '')
+      .split(',')
+      .map(_parseDate)
+      .whereType<DateTime>()
+      .map(
+        (date) =>
+            '${date.year.toString().padLeft(4, '0')}-'
+            '${date.month.toString().padLeft(2, '0')}-'
+            '${date.day.toString().padLeft(2, '0')}',
+      )
+      .toList(growable: false);
 
   return ExternalCalendarEvent(
     title: _unescape(properties['SUMMARY'] ?? ''),
@@ -58,7 +73,63 @@ ExternalCalendarEvent? _parseEvent(Map<String, String> properties) {
     startTime: start,
     endTime: end,
     isAllDay: allDay,
+    categoryName: properties['CATEGORIES'] == null
+        ? null
+        : _unescape(_firstCategory(properties['CATEGORIES']!)),
+    categoryColor: _parseColor(properties['X-APP-CATEGORY-COLOR']),
+    recurrenceFrequency: recurrence?.$1,
+    recurrenceEndDate: recurrence?.$2,
+    excludedOccurrenceDates: excludedDates,
   );
+}
+
+(RecurrenceFrequency, DateTime?)? _parseRecurrence(String? value) {
+  if (value == null) return null;
+  final properties = <String, String>{};
+  for (final component in value.split(';')) {
+    final separator = component.indexOf('=');
+    if (separator > 0) {
+      properties[component.substring(0, separator).toUpperCase()] = component
+          .substring(separator + 1);
+    }
+  }
+  final interval = int.tryParse(properties['INTERVAL'] ?? '1');
+  final frequency = switch ((properties['FREQ']?.toUpperCase(), interval)) {
+    ('WEEKLY', 1) => RecurrenceFrequency.weekly,
+    ('WEEKLY', 2) => RecurrenceFrequency.everyTwoWeeks,
+    ('WEEKLY', 3) => RecurrenceFrequency.everyThreeWeeks,
+    ('MONTHLY', 1) => RecurrenceFrequency.monthly,
+    _ => null,
+  };
+  if (frequency == null) return null;
+  final parsedEndDate = properties['UNTIL'] == null
+      ? null
+      : _parseDate(properties['UNTIL']!);
+  final endDate = parsedEndDate == null
+      ? null
+      : DateTime(parsedEndDate.year, parsedEndDate.month, parsedEndDate.day);
+  return (frequency, endDate);
+}
+
+String _firstCategory(String value) {
+  var isEscaped = false;
+  for (var index = 0; index < value.length; index++) {
+    final character = value[index];
+    if (character == ',' && !isEscaped) return value.substring(0, index);
+    if (character == r'\') {
+      isEscaped = !isEscaped;
+    } else {
+      isEscaped = false;
+    }
+  }
+  return value;
+}
+
+int? _parseColor(String? value) {
+  if (value == null) return null;
+  final normalized = value.trim().replaceFirst('#', '');
+  if (!RegExp(r'^[0-9a-fA-F]{6}$').hasMatch(normalized)) return null;
+  return int.tryParse('FF$normalized', radix: 16);
 }
 
 DateTime? _parseDate(String value) {
