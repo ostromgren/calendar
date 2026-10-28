@@ -373,6 +373,8 @@ class _CalendarViewState extends ConsumerState<CalendarView>
                     start: startTime,
                     end: endTime,
                     isAllDay: isAllDay,
+                    recurrenceFrequency: recurrenceFrequency,
+                    recurrenceEndDate: recurrenceEndDate,
                   );
                   await _viewModel.rememberDeviceCalendar(deviceCalendarId);
                 }
@@ -385,26 +387,10 @@ class _CalendarViewState extends ConsumerState<CalendarView>
   Future<void> _deleteEvent(CalendarEvent event) async {
     final l10n = AppLocalizations.of(context)!;
     var deleteSeries = false;
-    if (event.isDeviceCalendarEvent) {
-      final shouldDelete = await showDialog<bool>(
-        context: context,
-        builder: (dialogContext) => AlertDialog(
-          title: Text(l10n.deleteSyncedEventTitle),
-          content: Text(l10n.deleteSyncedEventConfirmation),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: Text(l10n.cancel),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(dialogContext).pop(true),
-              child: Text(l10n.deleteEvent),
-            ),
-          ],
-        ),
-      );
-      if (shouldDelete != true) return;
-    } else if (_viewModel.repository.isRecurringOccurrence(event.id)) {
+    final isRecurring = event.isRecurring ||
+        _viewModel.repository.isRecurringOccurrence(event.id);
+
+    if (isRecurring) {
       final deleteChoice = await showDialog<bool>(
         context: context,
         builder: (dialogContext) => AlertDialog(
@@ -428,11 +414,34 @@ class _CalendarViewState extends ConsumerState<CalendarView>
       );
       if (deleteChoice == null) return;
       deleteSeries = deleteChoice;
+    } else if (event.isDeviceCalendarEvent) {
+      final shouldDelete = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Text(l10n.deleteSyncedEventTitle),
+          content: Text(l10n.deleteSyncedEventConfirmation),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: Text(l10n.cancel),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: Text(l10n.deleteEvent),
+            ),
+          ],
+        ),
+      );
+      if (shouldDelete != true) return;
     }
 
     try {
       if (event.isDeviceCalendarEvent) {
-        await _deviceCalendarsViewModel.deleteEvent(event.id);
+        if (deleteSeries) {
+          await _deviceCalendarsViewModel.deleteEventSeries(event.id);
+        } else {
+          await _deviceCalendarsViewModel.deleteEvent(event.id);
+        }
       } else if (deleteSeries) {
         await _viewModel.deleteEventSeries(event.id);
       } else {
@@ -982,10 +991,6 @@ class _AddEventBottomSheetState extends State<_AddEventBottomSheet> {
                         setState(() {
                           _selectedCalendarId = calendarId;
                           _selectedCategoryId = null;
-                          if (calendarId.startsWith('device:')) {
-                            _recurrenceFrequency = null;
-                            _recurrenceEndDate = null;
-                          }
                         });
                       }
                     },
@@ -1030,7 +1035,8 @@ class _AddEventBottomSheetState extends State<_AddEventBottomSheet> {
                           setState(() => _selectedCategoryId = categoryId),
               ),
             ],
-            if (selectedLocalCalendar != null) ...[
+            if (selectedLocalCalendar != null ||
+                _selectedCalendarId.startsWith('device:')) ...[
               const SizedBox(height: 12),
               DropdownButtonFormField<RecurrenceFrequency?>(
                 key: const ValueKey('event-recurrence-dropdown'),

@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../../../../data/repositories/device_calendar_repository.dart';
 import '../../../../data/repositories/settings_repository.dart';
 import '../../../../domain/models/calendar_event.dart';
+import '../../../../domain/models/recurrence_frequency.dart';
 
 class DeviceCalendarsViewModel extends ChangeNotifier {
   DeviceCalendarsViewModel({
@@ -112,6 +113,8 @@ class DeviceCalendarsViewModel extends ChangeNotifier {
     required DateTime end,
     required String description,
     required bool isAllDay,
+    RecurrenceFrequency? recurrenceFrequency,
+    DateTime? recurrenceEndDate,
   }) async {
     final calendar = _calendars.where((item) => item.id == calendarId);
     if (!_hasPermission ||
@@ -128,6 +131,8 @@ class DeviceCalendarsViewModel extends ChangeNotifier {
       end: end,
       description: description,
       isAllDay: isAllDay,
+      recurrenceFrequency: recurrenceFrequency,
+      recurrenceEndDate: recurrenceEndDate,
     );
     await refreshEvents();
   }
@@ -138,6 +143,15 @@ class DeviceCalendarsViewModel extends ChangeNotifier {
       throw StateError('Cannot delete this device calendar event.');
     }
     await repository.deleteEvent(eventId.substring(prefix.length));
+    await refreshEvents();
+  }
+
+  Future<void> deleteEventSeries(String eventId) async {
+    const prefix = 'device:';
+    if (!eventId.startsWith(prefix) || !_hasPermission) {
+      throw StateError('Cannot delete this device calendar event.');
+    }
+    await repository.deleteEventSeries(eventId.substring(prefix.length));
     await refreshEvents();
   }
 

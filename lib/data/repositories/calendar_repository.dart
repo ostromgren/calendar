@@ -72,6 +72,7 @@ class CalendarRepository {
               color: event.color,
               readOnly: event.readOnly,
               isDeviceCalendarEvent: event.isDeviceCalendarEvent,
+              isRecurring: true,
             ),
           );
         }

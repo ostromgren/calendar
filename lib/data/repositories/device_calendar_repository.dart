@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../domain/models/calendar_event.dart';
+import '../../domain/models/recurrence_frequency.dart';
 
 class DeviceCalendarInfo {
   const DeviceCalendarInfo({
@@ -44,9 +45,13 @@ abstract interface class DeviceCalendarRepository {
     required DateTime end,
     required String description,
     required bool isAllDay,
+    RecurrenceFrequency? recurrenceFrequency,
+    DateTime? recurrenceEndDate,
   });
 
   Future<void> deleteEvent(String instanceId);
+
+  Future<void> deleteEventSeries(String instanceId);
 }
 
 class NativeDeviceCalendarRepository implements DeviceCalendarRepository {
@@ -123,6 +128,8 @@ class NativeDeviceCalendarRepository implements DeviceCalendarRepository {
             color: event.color ?? colors[event.calendarId] ?? Colors.blue,
             readOnly: readOnlyCalendars[event.calendarId] ?? true,
             isDeviceCalendarEvent: true,
+            isRecurring: event.isRecurring ||
+                InstanceIdParser.parse(event.instanceId).timestamp != null,
           ),
         )
         .toList(growable: false);
@@ -136,6 +143,8 @@ class NativeDeviceCalendarRepository implements DeviceCalendarRepository {
     required DateTime end,
     required String description,
     required bool isAllDay,
+    RecurrenceFrequency? recurrenceFrequency,
+    DateTime? recurrenceEndDate,
   }) async {
     await _deviceCalendar.createEvent(
       calendarId: calendarId,
@@ -144,10 +153,57 @@ class NativeDeviceCalendarRepository implements DeviceCalendarRepository {
       endDate: end,
       description: description,
       isAllDay: isAllDay,
+      recurrenceRule: _recurrenceRule(
+        recurrenceFrequency,
+        recurrenceEndDate,
+        isAllDay,
+      ),
     );
   }
 
   @override
   Future<void> deleteEvent(String instanceId) =>
       _deviceCalendar.deleteEvent(instanceId: instanceId);
+
+  @override
+  Future<void> deleteEventSeries(String instanceId) =>
+      _deviceCalendar.deleteRecurring(instanceId, EventSpan.allEvents);
+}
+
+RecurrenceRule? _recurrenceRule(
+  RecurrenceFrequency? frequency,
+  DateTime? endDate,
+  bool isAllDay,
+) {
+  if (frequency == null) return null;
+
+  final recurrenceEnd = endDate == null
+      ? null
+      : UntilEnd(
+          isAllDay
+              ? DateTime.utc(endDate.year, endDate.month, endDate.day)
+              : DateTime(
+                  endDate.year,
+                  endDate.month,
+                  endDate.day,
+                  23,
+                  59,
+                  59,
+                ).toUtc(),
+        );
+  return switch (frequency) {
+    RecurrenceFrequency.weekly => WeeklyRecurrence(end: recurrenceEnd),
+    RecurrenceFrequency.everyTwoWeeks => WeeklyRecurrence(
+      interval: 2,
+      end: recurrenceEnd,
+    ),
+    RecurrenceFrequency.everyThreeWeeks => WeeklyRecurrence(
+      interval: 3,
+      end: recurrenceEnd,
+    ),
+    RecurrenceFrequency.monthly => MonthlyRecurrence(
+      interval: 1,
+      end: recurrenceEnd,
+    ),
+  };
 }

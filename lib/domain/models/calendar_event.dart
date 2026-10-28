@@ -22,7 +22,8 @@ class CalendarEvent {
     this.recurrenceFrequency,
     this.recurrenceEndDate,
     this.excludedOccurrenceDates = const [],
-  });
+    bool? isRecurring,
+  }) : isRecurring = isRecurring ?? (recurrenceFrequency != null);
 
   final String id;
   final String title;
@@ -38,6 +39,7 @@ class CalendarEvent {
   final RecurrenceFrequency? recurrenceFrequency;
   final DateTime? recurrenceEndDate;
   final List<String> excludedOccurrenceDates;
+  final bool isRecurring;
 
   /// Returns true if this event falls on the specified [date] (ignoring time-of-day).
   bool isSameDay(DateTime date) {
@@ -59,6 +61,7 @@ class CalendarEvent {
     'recurrenceFrequency': recurrenceFrequency?.name,
     'recurrenceEndDate': recurrenceEndDate?.toIso8601String(),
     'excludedOccurrenceDates': excludedOccurrenceDates,
+    'isRecurring': isRecurring,
   };
 
   factory CalendarEvent.fromJson(Map<String, dynamic> json) => CalendarEvent(
@@ -80,6 +83,8 @@ class CalendarEvent {
     excludedOccurrenceDates:
         (json['excludedOccurrenceDates'] as List<dynamic>?)?.cast<String>() ??
         const [],
+    isRecurring:
+        json['isRecurring'] as bool? ?? (json['recurrenceFrequency'] != null),
   );
 
   /// Kotlin copy() equivalent in Dart idiom.
@@ -99,6 +104,7 @@ class CalendarEvent {
     RecurrenceFrequency? recurrenceFrequency,
     DateTime? recurrenceEndDate,
     List<String>? excludedOccurrenceDates,
+    bool? isRecurring,
   }) {
     return CalendarEvent(
       id: id ?? this.id,
@@ -117,6 +123,7 @@ class CalendarEvent {
       recurrenceEndDate: recurrenceEndDate ?? this.recurrenceEndDate,
       excludedOccurrenceDates:
           excludedOccurrenceDates ?? this.excludedOccurrenceDates,
+      isRecurring: isRecurring ?? this.isRecurring,
     );
   }
 

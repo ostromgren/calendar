@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:calendar/data/repositories/device_calendar_repository.dart';
 import 'package:calendar/data/repositories/settings_repository.dart';
 import 'package:calendar/domain/models/calendar_event.dart';
+import 'package:calendar/domain/models/recurrence_frequency.dart';
 import 'package:calendar/ui/features/settings/view_models/device_calendars_view_model.dart';
 
 class _FakeDeviceCalendarRepository implements DeviceCalendarRepository {
@@ -37,7 +38,10 @@ class _FakeDeviceCalendarRepository implements DeviceCalendarRepository {
   ];
   List<String> requestedCalendarIds = const [];
   String? createdCalendarId;
+  RecurrenceFrequency? createdRecurrenceFrequency;
+  DateTime? createdRecurrenceEndDate;
   final deletedInstanceIds = <String>[];
+  final deletedSeriesInstanceIds = <String>[];
 
   @override
   Future<List<DeviceCalendarInfo>> getCalendars() async => calendars;
@@ -62,8 +66,12 @@ class _FakeDeviceCalendarRepository implements DeviceCalendarRepository {
     required DateTime end,
     required String description,
     required bool isAllDay,
+    RecurrenceFrequency? recurrenceFrequency,
+    DateTime? recurrenceEndDate,
   }) async {
     createdCalendarId = calendarId;
+    createdRecurrenceFrequency = recurrenceFrequency;
+    createdRecurrenceEndDate = recurrenceEndDate;
     events.add(
       CalendarEvent(
         id: 'device:created-event',
@@ -75,6 +83,9 @@ class _FakeDeviceCalendarRepository implements DeviceCalendarRepository {
         isAllDay: isAllDay,
         readOnly: false,
         isDeviceCalendarEvent: true,
+        isRecurring: recurrenceFrequency != null,
+        recurrenceFrequency: recurrenceFrequency,
+        recurrenceEndDate: recurrenceEndDate,
       ),
     );
   }
@@ -83,6 +94,23 @@ class _FakeDeviceCalendarRepository implements DeviceCalendarRepository {
   Future<void> deleteEvent(String instanceId) async {
     deletedInstanceIds.add(instanceId);
     events.removeWhere((event) => event.id == 'device:$instanceId');
+  }
+
+  @override
+  Future<void> deleteEventSeries(String instanceId) async {
+    deletedSeriesInstanceIds.add(instanceId);
+    final baseId = instanceId.contains('@')
+        ? instanceId.substring(0, instanceId.lastIndexOf('@'))
+        : instanceId;
+    events.removeWhere((event) {
+      final rawId = event.id.startsWith('device:')
+          ? event.id.substring('device:'.length)
+          : event.id;
+      final eventBaseId = rawId.contains('@')
+          ? rawId.substring(0, rawId.lastIndexOf('@'))
+          : rawId;
+      return eventBaseId == baseId;
+    });
   }
 
   @override
@@ -171,9 +199,16 @@ void main() {
       start: DateTime(2026, 10, 24, 11),
       end: DateTime(2026, 10, 24, 12),
       isAllDay: false,
+      recurrenceFrequency: RecurrenceFrequency.everyTwoWeeks,
+      recurrenceEndDate: DateTime(2027, 10, 24),
     );
 
     expect(repository.createdCalendarId, 'google-work');
+    expect(
+      repository.createdRecurrenceFrequency,
+      RecurrenceFrequency.everyTwoWeeks,
+    );
+    expect(repository.createdRecurrenceEndDate, DateTime(2027, 10, 24));
     expect(viewModel.events.any((event) => event.title == 'Planning'), isTrue);
 
     await viewModel.deleteEvent('device:event-1');
@@ -182,6 +217,56 @@ void main() {
     expect(
       viewModel.events.any((event) => event.title == 'Google event'),
       isFalse,
+    );
+  });
+
+  test('deletes recurring event series from device calendar', () async {
+    SharedPreferences.setMockInitialValues({});
+    final settings = await SettingsRepository.load();
+    final repository = _FakeDeviceCalendarRepository();
+    repository.events.addAll([
+      CalendarEvent(
+        id: 'device:recurring-1@1700000000000',
+        title: 'Weekly Standup',
+        calendarId: 'google-primary',
+        startTime: DateTime(2026, 10, 24, 9),
+        endTime: DateTime(2026, 10, 24, 10),
+        readOnly: false,
+        isDeviceCalendarEvent: true,
+        isRecurring: true,
+      ),
+      CalendarEvent(
+        id: 'device:recurring-1@1700604800000',
+        title: 'Weekly Standup',
+        calendarId: 'google-primary',
+        startTime: DateTime(2026, 10, 31, 9),
+        endTime: DateTime(2026, 10, 31, 10),
+        readOnly: false,
+        isDeviceCalendarEvent: true,
+        isRecurring: true,
+      ),
+    ]);
+    final viewModel = DeviceCalendarsViewModel(
+      repository: repository,
+      settingsRepository: settings,
+    );
+    await viewModel.refreshEventsForRange(
+      DateTime(2026, 10, 1),
+      DateTime(2026, 11, 1),
+    );
+    await viewModel.load();
+
+    expect(
+      viewModel.events.where((e) => e.title == 'Weekly Standup'),
+      hasLength(2),
+    );
+
+    await viewModel.deleteEventSeries('device:recurring-1@1700000000000');
+
+    expect(repository.deletedSeriesInstanceIds, ['recurring-1@1700000000000']);
+    expect(
+      viewModel.events.where((e) => e.title == 'Weekly Standup'),
+      isEmpty,
     );
   });
 }
