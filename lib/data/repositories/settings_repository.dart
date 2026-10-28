@@ -240,6 +240,21 @@ class SettingsRepository {
     });
   }
 
+  /// Asks the home-screen widget to reload its timeline immediately.
+  ///
+  /// On iOS this calls [WidgetCenter.shared.reloadAllTimelines].
+  /// On Android this triggers [AppWidgetManager] to redraw all instances of
+  /// [CalendarWidgetProvider].
+  /// No-op on web and unsupported platforms.
+  Future<void> refreshWidget() async {
+    if (kIsWeb ||
+        (defaultTargetPlatform != TargetPlatform.iOS &&
+            defaultTargetPlatform != TargetPlatform.android)) {
+      return;
+    }
+    await _widgetChannel.invokeMethod<void>('refreshWidget');
+  }
+
   /// The last event destination, or the legacy local-calendar preference.
   String get lastUsedCalendarDestination =>
       _prefs.getString(_Keys.lastUsedCalendarDestination) ??

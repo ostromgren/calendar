@@ -98,6 +98,23 @@ class _CalendarViewState extends ConsumerState<CalendarView>
     if (state == AppLifecycleState.resumed) {
       setState(() {});
       _loadDeviceCalendars();
+      _refreshWidget();
+    } else if (state == AppLifecycleState.paused) {
+      _refreshWidget();
+    }
+  }
+
+  Future<void> _refreshWidget() async {
+    try {
+      await _viewModel.refreshWidget();
+    } on PlatformException catch (error, stackTrace) {
+      FlutterError.reportError(
+        FlutterErrorDetails(
+          exception: error,
+          stack: stackTrace,
+          library: 'calendar widget refresh',
+        ),
+      );
     }
   }
 

@@ -258,6 +258,9 @@ class CalendarViewModel extends ChangeNotifier {
 
   Future<void> syncWidgetEvents() => _settings.syncWidgetEvents();
 
+  /// Asks the home-screen widget to reload immediately (e.g. on app lifecycle changes).
+  Future<void> refreshWidget() => _settings.refreshWidget();
+
   /// Checks if any events exist on the specified [date] (used to display dot indicators).
   bool hasEventsOn(DateTime date) {
     return repository.getEventsForDay(date).isNotEmpty;

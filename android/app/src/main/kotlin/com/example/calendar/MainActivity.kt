@@ -1,5 +1,7 @@
 package com.example.calendar
 
+import android.appwidget.AppWidgetManager
+import android.content.ComponentName
 import android.content.Intent
 import android.provider.CalendarContract
 import io.flutter.embedding.engine.FlutterEngine
@@ -15,6 +17,24 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+
+        // Widget refresh channel
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            "calendar/widget"
+        ).setMethodCallHandler { call, result ->
+            if (call.method == "refreshWidget") {
+                val manager = AppWidgetManager.getInstance(this)
+                val ids = manager.getAppWidgetIds(
+                    ComponentName(this, CalendarWidgetProvider::class.java)
+                )
+                ids.forEach { CalendarWidgetProvider.updateWidget(this, manager, it) }
+                result.success(null)
+            } else {
+                result.notImplemented()
+            }
+        }
+
         intentChannel = MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
             channelName

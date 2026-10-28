@@ -52,6 +52,11 @@ import WidgetKit
       binaryMessenger: widgetRegistrar.messenger()
     )
     widgetChannel.setMethodCallHandler { call, result in
+      if call.method == "refreshWidget" {
+        WidgetCenter.shared.reloadAllTimelines()
+        result(nil)
+        return
+      }
       guard call.method == "syncLocalEvents" else {
         result(FlutterMethodNotImplemented)
         return
