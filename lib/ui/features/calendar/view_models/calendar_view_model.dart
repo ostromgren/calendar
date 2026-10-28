@@ -256,6 +256,8 @@ class CalendarViewModel extends ChangeNotifier {
   List<CalendarEvent> get selectedDateEvents =>
       repository.getEventsForDay(_selectedDate);
 
+  Future<void> syncWidgetEvents() => _settings.syncWidgetEvents();
+
   /// Checks if any events exist on the specified [date] (used to display dot indicators).
   bool hasEventsOn(DateTime date) {
     return repository.getEventsForDay(date).isNotEmpty;

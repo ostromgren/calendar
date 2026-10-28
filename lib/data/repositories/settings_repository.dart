@@ -1,6 +1,8 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:calendar/domain/models/app_language.dart';
 import 'package:calendar/domain/models/local_calendar.dart';
@@ -25,6 +27,8 @@ abstract final class _Keys {
   static const String eventCategories = 'settings.event_categories';
   static const String localEvents = 'settings.local_events';
 }
+
+const _widgetChannel = MethodChannel('calendar/widget');
 
 /// Persists and retrieves user settings using [SharedPreferences].
 ///
@@ -216,12 +220,24 @@ class SettingsRepository {
 
   /// Persists events in app-managed local calendars.
   Future<void> saveLocalEvents(Iterable<CalendarEvent> events) async {
-    if (!await _prefs.setString(
-      _Keys.localEvents,
-      jsonEncode(events.map((event) => event.toJson()).toList()),
-    )) {
+    final encoded = jsonEncode(events.map((event) => event.toJson()).toList());
+    if (!await _prefs.setString(_Keys.localEvents, encoded)) {
       throw StateError('Could not save local calendar events.');
     }
+    await _syncWidgetEvents(encoded);
+  }
+
+  /// Makes locally managed events available to the iOS home-screen widget.
+  Future<void> syncWidgetEvents() async {
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.iOS) return;
+    await _syncWidgetEvents(_prefs.getString(_Keys.localEvents) ?? '[]');
+  }
+
+  Future<void> _syncWidgetEvents(String encoded) async {
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.iOS) return;
+    await _widgetChannel.invokeMethod<void>('syncLocalEvents', {
+      'events': encoded,
+    });
   }
 
   /// The last event destination, or the legacy local-calendar preference.

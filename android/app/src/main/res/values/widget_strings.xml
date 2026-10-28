@@ -11,5 +11,6 @@
     <string name="calendar_widget_load_error">Couldn\'t load calendar events.</string>
     <string name="calendar_widget_all_day">All day</string>
     <string name="calendar_widget_untitled">Untitled event</string>
+    <string name="calendar_widget_more_events">+%1$d more that day</string>
     <string name="calendar_widget_save_error">Could not save widget settings.</string>
 </resources>

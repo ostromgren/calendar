@@ -106,6 +106,7 @@ class CalendarWidgetProvider : AppWidgetProvider() {
                 R.id.widget_events,
                 if (showsEvents) View.VISIBLE else View.GONE,
             )
+            views.setViewVisibility(R.id.widget_more_events, View.GONE)
 
             if (showsEvents) {
                 val calendarData = readUpcomingEvents(context, now)
@@ -156,6 +157,26 @@ class CalendarWidgetProvider : AppWidgetProvider() {
                             views.setViewVisibility(R.id.widget_event_two, View.VISIBLE)
                         } else {
                             views.setViewVisibility(R.id.widget_event_two, View.GONE)
+                        }
+                        val visibleEvents = if (showsSecondEvent && secondEvent != null) {
+                            listOf(calendarData.events[0], secondEvent)
+                        } else {
+                            listOf(calendarData.events[0])
+                        }
+                        val visibleOnFirstDay = visibleEvents.count {
+                            isSameLocalDay(it.begin, calendarData.events[0].begin)
+                        }
+                        val additionalEvents =
+                            calendarData.firstDayEventCount - visibleOnFirstDay
+                        if (additionalEvents > 0) {
+                            views.setTextViewText(
+                                R.id.widget_more_events,
+                                context.getString(
+                                    R.string.calendar_widget_more_events,
+                                    additionalEvents,
+                                ),
+                            )
+                            views.setViewVisibility(R.id.widget_more_events, View.VISIBLE)
                         }
                     }
                 }
@@ -229,6 +250,9 @@ class CalendarWidgetProvider : AppWidgetProvider() {
             )
             val selectedIds = (selectedCalendars as? CalendarSelection.Selected)?.ids
             val events = mutableListOf<WidgetEvent>()
+            var firstDayYear: Int? = null
+            var firstDayOfYear: Int? = null
+            var firstDayEventCount = 0
             val cursor: Cursor? = try {
                 context.contentResolver.query(
                     instancesUri,
@@ -250,20 +274,43 @@ class CalendarWidgetProvider : AppWidgetProvider() {
                 val beginColumn = it.getColumnIndexOrThrow(CalendarContract.Instances.BEGIN)
                 val allDayColumn = it.getColumnIndexOrThrow(CalendarContract.Instances.ALL_DAY)
                 val calendarColumn = it.getColumnIndexOrThrow(CalendarContract.Instances.CALENDAR_ID)
-                while (it.moveToNext() && events.size < 2) {
+                while (it.moveToNext()) {
                     val calendarId = it.getString(calendarColumn)
                     if (selectedIds != null && calendarId !in selectedIds) continue
                     val begin = it.getLong(beginColumn)
                     if (begin >= end) continue
-                    events += WidgetEvent(
-                        title = it.getString(titleColumn)?.takeIf(String::isNotBlank)
-                            ?: context.getString(R.string.calendar_widget_untitled),
-                        begin = begin,
-                        allDay = it.getInt(allDayColumn) != 0,
-                    )
+                    val eventDay = Calendar.getInstance().apply { timeInMillis = begin }
+                    if (firstDayYear == null) {
+                        firstDayYear = eventDay.get(Calendar.YEAR)
+                        firstDayOfYear = eventDay.get(Calendar.DAY_OF_YEAR)
+                    }
+                    if (
+                        eventDay.get(Calendar.YEAR) == firstDayYear &&
+                        eventDay.get(Calendar.DAY_OF_YEAR) == firstDayOfYear
+                    ) {
+                        firstDayEventCount++
+                    }
+                    if (events.size < 2) {
+                        events += WidgetEvent(
+                            title = it.getString(titleColumn)?.takeIf(String::isNotBlank)
+                                ?: context.getString(R.string.calendar_widget_untitled),
+                            begin = begin,
+                            allDay = it.getInt(allDayColumn) != 0,
+                        )
+                    }
                 }
             }
-            return CalendarData(events = events)
+            return CalendarData(
+                events = events,
+                firstDayEventCount = firstDayEventCount,
+            )
+        }
+
+        private fun isSameLocalDay(first: Long, second: Long): Boolean {
+            val firstDay = Calendar.getInstance().apply { timeInMillis = first }
+            val secondDay = Calendar.getInstance().apply { timeInMillis = second }
+            return firstDay.get(Calendar.YEAR) == secondDay.get(Calendar.YEAR) &&
+                firstDay.get(Calendar.DAY_OF_YEAR) == secondDay.get(Calendar.DAY_OF_YEAR)
         }
 
         private fun readSelectedCalendars(
@@ -309,6 +356,7 @@ private data class WidgetEvent(
 
 private data class CalendarData(
     val events: List<WidgetEvent> = emptyList(),
+    val firstDayEventCount: Int = 0,
     val permissionDenied: Boolean = false,
     val failedToLoad: Boolean = false,
 )

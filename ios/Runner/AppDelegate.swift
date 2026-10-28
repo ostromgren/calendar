@@ -1,8 +1,10 @@
 import Flutter
 import UIKit
+import WidgetKit
 
 @main
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
+  private static let appGroupIdentifier = "group.com.example.calendar"
   static var pendingCalendarRequests: [[String: Any]] = []
   static var calendarIntentChannel: FlutterMethodChannel?
   static var dartReady = false
@@ -36,6 +38,50 @@ import UIKit
       } else {
         result(FlutterMethodNotImplemented)
       }
+    }
+
+    guard
+      let widgetRegistrar = engineBridge.pluginRegistry.registrar(
+        forPlugin: "CalendarWidgetBridge"
+      )
+    else {
+      fatalError("Unable to register the calendar widget channel.")
+    }
+    let widgetChannel = FlutterMethodChannel(
+      name: "calendar/widget",
+      binaryMessenger: widgetRegistrar.messenger()
+    )
+    widgetChannel.setMethodCallHandler { call, result in
+      guard call.method == "syncLocalEvents" else {
+        result(FlutterMethodNotImplemented)
+        return
+      }
+      guard
+        let arguments = call.arguments as? [String: Any],
+        let events = arguments["events"] as? String
+      else {
+        result(
+          FlutterError(
+            code: "invalid_widget_events",
+            message: "Local event data was missing or invalid.",
+            details: nil
+          )
+        )
+        return
+      }
+      guard let defaults = UserDefaults(suiteName: Self.appGroupIdentifier) else {
+        result(
+          FlutterError(
+            code: "widget_storage_unavailable",
+            message: "Shared storage for the calendar widget is unavailable.",
+            details: nil
+          )
+        )
+        return
+      }
+      defaults.set(events, forKey: "localCalendarEvents")
+      WidgetCenter.shared.reloadAllTimelines()
+      result(nil)
     }
   }
 

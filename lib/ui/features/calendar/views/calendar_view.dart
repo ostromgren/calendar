@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:calendar/domain/models/calendar_event.dart';
 import 'package:calendar/l10n/generated/app_localizations.dart';
@@ -56,8 +57,23 @@ class _CalendarViewState extends ConsumerState<CalendarView>
     widget.intentService?.addListener(_processIncomingEvents);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _processIncomingEvents();
+      _syncWidgetEvents();
       _loadDeviceCalendars();
     });
+  }
+
+  Future<void> _syncWidgetEvents() async {
+    try {
+      await _viewModel.syncWidgetEvents();
+    } on PlatformException catch (error, stackTrace) {
+      FlutterError.reportError(
+        FlutterErrorDetails(
+          exception: error,
+          stack: stackTrace,
+          library: 'calendar widget sync',
+        ),
+      );
+    }
   }
 
   @override
