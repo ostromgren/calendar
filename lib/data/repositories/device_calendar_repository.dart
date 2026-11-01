@@ -1,6 +1,6 @@
 import 'package:device_calendar_plus/device_calendar_plus.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../../domain/models/calendar_event.dart';
 import '../../domain/models/recurrence_frequency.dart';

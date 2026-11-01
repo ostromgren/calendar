@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -13,6 +13,19 @@ import 'package:calendar/domain/models/recurrence_frequency.dart';
 import 'package:calendar/ui/features/settings/view_models/theme_view_model.dart';
 
 import 'test_app.dart';
+
+Future<void> scrollUntilHitTestable(WidgetTester tester, Finder target) async {
+  final scrollable = find.byType(CustomScrollView);
+  for (
+    var attempt = 0;
+    attempt < 10 && target.hitTestable().evaluate().isEmpty;
+    attempt++
+  ) {
+    await tester.drag(scrollable, const Offset(0, -200));
+    await tester.pumpAndSettle();
+  }
+  expect(target.hitTestable(), findsOneWidget);
+}
 
 void main() {
   Future<(CalendarViewModel, ThemeViewModel, SettingsRepository)>
@@ -204,11 +217,8 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(
-      find.text(description),
-      200,
-      scrollable: find.byType(Scrollable).first,
-    );
+    final expandDescription = find.byTooltip('Show full description');
+    await scrollUntilHitTestable(tester, expandDescription);
 
     final descriptionText = find.text(description);
     expect(tester.widget<Text>(descriptionText).maxLines, 2);
@@ -223,7 +233,7 @@ void main() {
     final deletePosition =
         tester.getTopLeft(deleteButton) - tester.getTopLeft(card);
 
-    await tester.tap(find.byTooltip('Show full description'));
+    await tester.tap(expandDescription);
     await tester.pumpAndSettle();
     expect(tester.widget<Text>(descriptionText).maxLines, isNull);
     expect(tester.getTopLeft(marker) - tester.getTopLeft(card), markerPosition);
@@ -302,6 +312,7 @@ void main() {
     await tester.ensureVisible(find.text('Save Event'));
     await tester.tap(find.text('Save Event'));
     await tester.pumpAndSettle();
+    expect(find.text('Add Event'), findsNothing);
 
     final event = viewModel.repository.getAllEvents().single;
     expect(event.title, 'Project sync');
@@ -311,12 +322,10 @@ void main() {
     expect(event.recurrenceFrequency, RecurrenceFrequency.everyTwoWeeks);
     expect(event.recurrenceEndDate, isNotNull);
 
-    await tester.scrollUntilVisible(
-      find.text('Project sync'),
-      200,
-      scrollable: find.byType(Scrollable).first,
-    );
-    await tester.tap(find.byKey(const ValueKey('event-delete-button')).last);
+    final deleteButton = find.byKey(const ValueKey('event-delete-button'));
+    await scrollUntilHitTestable(tester, deleteButton);
+    expect(find.text('Project sync'), findsOneWidget);
+    await tester.tap(deleteButton);
     await tester.pumpAndSettle();
     expect(find.text('Delete recurring event?'), findsOneWidget);
     expect(find.text('This event only'), findsOneWidget);

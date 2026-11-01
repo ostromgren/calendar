@@ -4,7 +4,7 @@ import 'package:calendar/providers.dart';
 import 'package:calendar/ui/features/calendar/view_models/calendar_view_model.dart';
 import 'package:calendar/ui/features/settings/view_models/device_calendars_view_model.dart';
 import 'package:calendar/ui/features/settings/view_models/theme_view_model.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 Widget createCalendarTestApp({

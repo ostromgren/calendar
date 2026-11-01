@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Renders a single day cell inside the calendar grid.
 class DayCell extends StatelessWidget {

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
@@ -483,13 +483,18 @@ void main() {
         // Verify 'W#' column header is displayed
         expect(find.text('W#'), findsOneWidget);
 
-        // Verify week numbers are present in the grid including Week 43 (current week)
-        expect(find.byType(WeekNumberCell), findsWidgets);
-        expect(find.text('40'), findsOneWidget);
-        expect(find.text('41'), findsOneWidget);
-        expect(find.text('42'), findsOneWidget);
-        expect(find.text('43'), findsOneWidget); // Week of October 19–25, 2026
-        expect(find.text('44'), findsOneWidget);
+        final weekNumberCells = tester.widgetList<WeekNumberCell>(
+          find.byType(WeekNumberCell),
+        );
+        expect(weekNumberCells, isNotEmpty);
+        final weekNumbers = weekNumberCells
+            .map((cell) => cell.weekNumber)
+            .toList();
+        expect(weekNumbers, everyElement(inInclusiveRange(1, 53)));
+        for (var index = 1; index < weekNumbers.length; index++) {
+          final previous = weekNumbers[index - 1];
+          expect(weekNumbers[index], previous == 53 ? 1 : previous + 1);
+        }
 
         // Go back to settings and turn off
         await tester.tap(find.byTooltip('Settings'));

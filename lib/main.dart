@@ -1,7 +1,6 @@
 import 'package:dynamic_color/dynamic_color.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:calendar/l10n/generated/app_localizations.dart';
 
 import 'data/calendar_intent_service.dart';
@@ -66,11 +65,9 @@ class CalendarApp extends ConsumerWidget {
           darkTheme: darkTheme,
           themeMode: themeViewModel.themeMode,
           locale: themeViewModel.locale,
-          localizationsDelegates: const [
+          localizationsDelegates: [
             AppLocalizations.delegate,
-            GlobalMaterialLocalizations.delegate,
-            GlobalWidgetsLocalizations.delegate,
-            GlobalCupertinoLocalizations.delegate,
+            ...GlobalMaterialLocalizations.delegates,
           ],
           supportedLocales: AppLocalizations.supportedLocales,
           home: CalendarView(

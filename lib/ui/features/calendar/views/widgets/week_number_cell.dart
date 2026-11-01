@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Renders a subtle indicator cell displaying the ISO 8601 week number
 /// for a row in the monthly calendar grid.

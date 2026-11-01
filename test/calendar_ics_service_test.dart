@@ -7,7 +7,7 @@ import 'package:calendar/domain/models/calendar_event.dart';
 import 'package:calendar/domain/models/event_category.dart';
 import 'package:calendar/domain/models/recurrence_frequency.dart';
 import 'package:calendar/ui/features/calendar/view_models/calendar_view_model.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
