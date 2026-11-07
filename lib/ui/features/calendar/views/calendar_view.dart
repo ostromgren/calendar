@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
@@ -6,6 +8,7 @@ import 'package:calendar/domain/models/calendar_event.dart';
 import 'package:calendar/l10n/generated/app_localizations.dart';
 
 import '../../../../data/calendar_intent_service.dart';
+import '../../../../data/event_reminder_service.dart';
 import '../../../../data/repositories/device_calendar_repository.dart';
 import '../../../../providers.dart';
 import '../../../../domain/models/external_calendar_event.dart';
@@ -33,9 +36,10 @@ import 'widgets/week_number_cell.dart';
 ///
 /// Watches calendar state through Riverpod and handles screen-level lifecycle.
 class CalendarView extends ConsumerStatefulWidget {
-  const CalendarView({super.key, this.intentService});
+  const CalendarView({super.key, this.intentService, this.reminderService});
 
   final CalendarIntentService? intentService;
+  final EventReminderService? reminderService;
 
   @override
   ConsumerState<CalendarView> createState() => _CalendarViewState();
@@ -49,14 +53,18 @@ class _CalendarViewState extends ConsumerState<CalendarView>
   bool _processingIncomingEvents = false;
   DateTime? _requestedDeviceEventsMonth;
   bool _isAgendaView = false;
+  EventReminderTarget? _reminderTarget;
+  final GlobalKey _reminderTargetKey = GlobalKey();
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     widget.intentService?.addListener(_processIncomingEvents);
+    widget.reminderService?.target.addListener(_handleReminderTarget);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _processIncomingEvents();
+      _handleReminderTarget();
       _syncWidgetEvents();
       _loadDeviceCalendars();
     });
@@ -84,13 +92,66 @@ class _CalendarViewState extends ConsumerState<CalendarView>
       widget.intentService?.addListener(_processIncomingEvents);
       _processIncomingEvents();
     }
+    if (oldWidget.reminderService != widget.reminderService) {
+      oldWidget.reminderService?.target.removeListener(_handleReminderTarget);
+      widget.reminderService?.target.addListener(_handleReminderTarget);
+      _handleReminderTarget();
+    }
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     widget.intentService?.removeListener(_processIncomingEvents);
+    widget.reminderService?.target.removeListener(_handleReminderTarget);
     super.dispose();
+  }
+
+  void _handleReminderTarget() {
+    final target = widget.reminderService?.target.value;
+    if (target == null) return;
+    _viewModel.selectDate(target.startTime);
+    setState(() => _reminderTarget = target);
+    unawaited(_scrollToReminderTarget(target));
+  }
+
+  Future<void> _scrollToReminderTarget(EventReminderTarget target) async {
+    if (target.eventId == null) {
+      final dayStart = DateTime(
+        target.startTime.year,
+        target.startTime.month,
+        target.startTime.day,
+      );
+      await _deviceCalendarsViewModel.load();
+      await _deviceCalendarsViewModel.refreshEventsForRange(
+        dayStart,
+        dayStart.add(const Duration(days: 1)),
+      );
+    }
+    if (!mounted) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final targetContext = _reminderTargetKey.currentContext;
+      if (targetContext != null) {
+        unawaited(
+          Scrollable.ensureVisible(
+            targetContext,
+            alignment: 0.3,
+            duration: const Duration(milliseconds: 300),
+          ),
+        );
+      }
+    });
+  }
+
+  Key _eventTileKey(CalendarEvent event) {
+    final target = _reminderTarget;
+    if (target != null &&
+        ((target.eventId != null && target.eventId == event.id) ||
+            (target.title == event.title &&
+                target.startTime.isAtSameMomentAs(event.startTime)))) {
+      return _reminderTargetKey;
+    }
+    return ValueKey('event-${event.id}');
   }
 
   @override
@@ -199,7 +260,7 @@ class _CalendarViewState extends ConsumerState<CalendarView>
       while (mounted && service.hasPendingEvents) {
         final event = service.takeNextEvent();
         _viewModel.selectDate(event.startTime);
-        await _showAddEventDialog(context, event);
+        await _showAddEventDialog(context, initialEvent: event);
       }
     } finally {
       _processingIncomingEvents = false;
@@ -344,10 +405,16 @@ class _CalendarViewState extends ConsumerState<CalendarView>
   }
 
   Future<void> _showAddEventDialog(
-    BuildContext context, [
+    BuildContext context, {
     ExternalCalendarEvent? initialEvent,
-  ]) {
+    CalendarEvent? editingEvent,
+    bool updateSeries = false,
+    int? initialReminderMinutesBefore,
+    String? initialReminderEventKey,
+  }) {
     final calendarsViewModel = _deviceCalendarsViewModel;
+    final reminderService = ref.read(eventReminderServiceProvider);
+    final l10n = AppLocalizations.of(context)!;
     final selectedCalendarIds = calendarsViewModel.selectedCalendarIds;
     final deviceCalendars = calendarsViewModel.calendars
         .where(
@@ -355,6 +422,17 @@ class _CalendarViewState extends ConsumerState<CalendarView>
               !calendar.readOnly && selectedCalendarIds.contains(calendar.id),
         )
         .toList(growable: false);
+    final selectedLocalCalendar = editingEvent == null
+        ? _viewModel.lastUsedCalendar
+        : _viewModel.localCalendars.firstWhere(
+            (calendar) => calendar.id == editingEvent.calendarId,
+            orElse: () => _viewModel.lastUsedCalendar,
+          );
+    final calendarDestination = editingEvent == null
+        ? _viewModel.lastUsedCalendarDestination
+        : editingEvent.isDeviceCalendarEvent
+        ? 'device:${editingEvent.calendarId}'
+        : 'local:${editingEvent.calendarId}';
     return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -364,13 +442,21 @@ class _CalendarViewState extends ConsumerState<CalendarView>
       ),
       builder: (sheetContext) {
         return _AddEventBottomSheet(
-          selectedDate: initialEvent?.startTime ?? _viewModel.selectedDate,
-          initialCalendar: _viewModel.lastUsedCalendar,
-          initialCalendarDestination: _viewModel.lastUsedCalendarDestination,
+          selectedDate:
+              editingEvent?.startTime ??
+              initialEvent?.startTime ??
+              _viewModel.selectedDate,
+          initialCalendar: selectedLocalCalendar,
+          initialCalendarDestination: calendarDestination,
           localCalendars: _viewModel.localCalendars,
           categoriesForCalendar: _viewModel.categoriesFor,
           deviceCalendars: deviceCalendars,
           initialEvent: initialEvent,
+          editingEvent: editingEvent,
+          updateSeries: updateSeries,
+          initialReminderMinutesBefore:
+              initialReminderMinutesBefore ??
+              editingEvent?.reminderMinutesBefore,
           onSave:
               ({
                 required String title,
@@ -384,8 +470,137 @@ class _CalendarViewState extends ConsumerState<CalendarView>
                 required bool isAllDay,
                 required RecurrenceFrequency? recurrenceFrequency,
                 required DateTime? recurrenceEndDate,
+                required int? reminderMinutesBefore,
               }) async {
-                if (deviceCalendarId == null) {
+                if (editingEvent != null &&
+                    editingEvent.isDeviceCalendarEvent) {
+                  final reminderService = ref.read(
+                    eventReminderServiceProvider,
+                  );
+                  final oldReminderMinutes =
+                      initialReminderMinutesBefore ??
+                      editingEvent.reminderMinutesBefore;
+                  final updatedReminderEvent = CalendarEvent(
+                    id: editingEvent.id,
+                    title: title,
+                    description: description,
+                    calendarId: editingEvent.calendarId,
+                    startTime: startTime,
+                    endTime: endTime,
+                    isAllDay: isAllDay,
+                    color: editingEvent.color,
+                    readOnly: editingEvent.readOnly,
+                    isDeviceCalendarEvent: true,
+                    recurrenceFrequency: updateSeries
+                        ? editingEvent.recurrenceFrequency
+                        : null,
+                    recurrenceEndDate: updateSeries
+                        ? editingEvent.recurrenceEndDate
+                        : null,
+                    isRecurring: updateSeries && editingEvent.isRecurring,
+                  );
+                  if (oldReminderMinutes != null && reminderService == null) {
+                    throw StateError('Event reminders are not available.');
+                  }
+                  await reminderService?.cancelEvent(
+                    initialReminderEventKey ??
+                        EventReminderService.keyForEvent(editingEvent),
+                    occurrenceStartTime: updateSeries
+                        ? null
+                        : editingEvent.startTime,
+                  );
+                  try {
+                    if (reminderMinutesBefore != null) {
+                      if (reminderService == null) {
+                        throw StateError('Event reminders are not available.');
+                      }
+                      await reminderService.scheduleEvent(
+                        event: updatedReminderEvent,
+                        minutesBefore: reminderMinutesBefore,
+                        body: l10n.eventStartsAt(
+                          DateFormat.jm(
+                            Localizations.localeOf(context).toString(),
+                          ).format(startTime),
+                        ),
+                      );
+                    }
+                    await calendarsViewModel.updateEvent(
+                      eventId: editingEvent.id,
+                      title: title,
+                      description: description,
+                      start: startTime,
+                      end: endTime,
+                      isAllDay: isAllDay,
+                      updateSeries: updateSeries,
+                    );
+                  } catch (_) {
+                    await reminderService?.cancelEvent(
+                      EventReminderService.keyForEvent(updatedReminderEvent),
+                      occurrenceStartTime: updateSeries ? null : startTime,
+                    );
+                    if (oldReminderMinutes != null && reminderService != null) {
+                      final oldReminderEvent = CalendarEvent(
+                        id: editingEvent.id,
+                        title: editingEvent.title,
+                        description: editingEvent.description,
+                        calendarId: editingEvent.calendarId,
+                        startTime: editingEvent.startTime,
+                        endTime: editingEvent.endTime,
+                        isAllDay: editingEvent.isAllDay,
+                        color: editingEvent.color,
+                        isDeviceCalendarEvent: true,
+                        recurrenceFrequency: updateSeries
+                            ? editingEvent.recurrenceFrequency
+                            : null,
+                        recurrenceEndDate: updateSeries
+                            ? editingEvent.recurrenceEndDate
+                            : null,
+                        isRecurring: updateSeries && editingEvent.isRecurring,
+                      );
+                      await reminderService.scheduleEvent(
+                        event: oldReminderEvent,
+                        minutesBefore: oldReminderMinutes,
+                        body: l10n.eventStartsAt(
+                          DateFormat.jm(
+                            Localizations.localeOf(context).toString(),
+                          ).format(editingEvent.startTime),
+                        ),
+                      );
+                    }
+                    rethrow;
+                  }
+                } else if (editingEvent != null) {
+                  await _viewModel.updateEvent(
+                    existingEvent: editingEvent,
+                    title: title,
+                    description: description,
+                    startTime: startTime,
+                    endTime: endTime,
+                    calendar: calendar,
+                    categoryId: categoryId,
+                    categoryColor: categoryColor,
+                    isAllDay: isAllDay,
+                    recurrenceFrequency: recurrenceFrequency,
+                    recurrenceEndDate: recurrenceEndDate,
+                    reminderMinutesBefore: reminderMinutesBefore,
+                    reminderBody: reminderMinutesBefore == null
+                        ? null
+                        : l10n.eventStartsAt(
+                            DateFormat.jm(
+                              Localizations.localeOf(context).toString(),
+                            ).format(startTime),
+                          ),
+                    previousReminderBody:
+                        editingEvent.reminderMinutesBefore == null
+                        ? null
+                        : l10n.eventStartsAt(
+                            DateFormat.jm(
+                              Localizations.localeOf(context).toString(),
+                            ).format(editingEvent.startTime),
+                          ),
+                    updateSeries: updateSeries,
+                  );
+                } else if (deviceCalendarId == null) {
                   await _viewModel.addEvent(
                     title: title,
                     description: description,
@@ -397,18 +612,65 @@ class _CalendarViewState extends ConsumerState<CalendarView>
                     isAllDay: isAllDay,
                     recurrenceFrequency: recurrenceFrequency,
                     recurrenceEndDate: recurrenceEndDate,
+                    reminderMinutesBefore: reminderMinutesBefore,
+                    reminderBody: reminderMinutesBefore == null
+                        ? null
+                        : l10n.eventStartsAt(
+                            DateFormat.jm(
+                              Localizations.localeOf(context).toString(),
+                            ).format(startTime),
+                          ),
                   );
                 } else {
-                  await calendarsViewModel.createEvent(
-                    calendarId: deviceCalendarId,
-                    title: title,
-                    description: description,
-                    start: startTime,
-                    end: endTime,
-                    isAllDay: isAllDay,
-                    recurrenceFrequency: recurrenceFrequency,
-                    recurrenceEndDate: recurrenceEndDate,
-                  );
+                  final reminderEvent = reminderMinutesBefore == null
+                      ? null
+                      : CalendarEvent(
+                          id:
+                              'device|$deviceCalendarId|$title|'
+                              '${startTime.toUtc().microsecondsSinceEpoch}',
+                          title: title,
+                          description: description,
+                          calendarId: deviceCalendarId,
+                          startTime: startTime,
+                          endTime: endTime,
+                          isAllDay: isAllDay,
+                          isDeviceCalendarEvent: true,
+                          recurrenceFrequency: recurrenceFrequency,
+                          recurrenceEndDate: recurrenceEndDate,
+                        );
+                  if (reminderEvent != null && reminderMinutesBefore != null) {
+                    if (reminderService == null) {
+                      throw StateError('Event reminders are not available.');
+                    }
+                    await reminderService.scheduleEvent(
+                      event: reminderEvent,
+                      minutesBefore: reminderMinutesBefore,
+                      body: l10n.eventStartsAt(
+                        DateFormat.jm(
+                          Localizations.localeOf(context).toString(),
+                        ).format(startTime),
+                      ),
+                    );
+                  }
+                  try {
+                    await calendarsViewModel.createEvent(
+                      calendarId: deviceCalendarId,
+                      title: title,
+                      description: description,
+                      start: startTime,
+                      end: endTime,
+                      isAllDay: isAllDay,
+                      recurrenceFrequency: recurrenceFrequency,
+                      recurrenceEndDate: recurrenceEndDate,
+                    );
+                  } catch (_) {
+                    if (reminderEvent != null) {
+                      await reminderService!.cancelEvent(
+                        EventReminderService.keyForEvent(reminderEvent),
+                      );
+                    }
+                    rethrow;
+                  }
                   await _viewModel.rememberDeviceCalendar(deviceCalendarId);
                 }
               },
@@ -417,10 +679,69 @@ class _CalendarViewState extends ConsumerState<CalendarView>
     );
   }
 
+  Future<void> _showEditEventDialog(CalendarEvent event) async {
+    var updateSeries = false;
+    if (event.isRecurring) {
+      final l10n = AppLocalizations.of(context)!;
+      final choice = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Text(l10n.editRecurringEventTitle),
+          content: Text(l10n.editRecurringEventConfirmation),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(null),
+              child: Text(l10n.cancel),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: Text(l10n.deleteThisEventOnly),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: Text(l10n.deleteEntireSeries),
+            ),
+          ],
+        ),
+      );
+      if (choice == null) return;
+      updateSeries = choice;
+    }
+
+    var eventToEdit = event;
+    if (updateSeries &&
+        !event.isDeviceCalendarEvent &&
+        event.id.contains('::')) {
+      final seriesId = event.id.substring(0, event.id.indexOf('::'));
+      eventToEdit = _viewModel.repository.getAllEvents().firstWhere(
+        (storedEvent) => storedEvent.id == seriesId,
+      );
+    }
+
+    var reminderMinutesBefore = eventToEdit.reminderMinutesBefore;
+    String? reminderEventKey;
+    if (eventToEdit.isDeviceCalendarEvent) {
+      final reminderTarget = await ref
+          .read(eventReminderServiceProvider)
+          ?.reminderForEvent(eventToEdit);
+      reminderMinutesBefore = reminderTarget?.minutesBefore;
+      reminderEventKey = reminderTarget?.eventKey;
+    }
+    if (!mounted) return;
+    await _showAddEventDialog(
+      context,
+      editingEvent: eventToEdit,
+      updateSeries: updateSeries,
+      initialReminderMinutesBefore: reminderMinutesBefore,
+      initialReminderEventKey: reminderEventKey,
+    );
+  }
+
   Future<void> _deleteEvent(CalendarEvent event) async {
     final l10n = AppLocalizations.of(context)!;
     var deleteSeries = false;
-    final isRecurring = event.isRecurring ||
+    final isRecurring =
+        event.isRecurring ||
         _viewModel.repository.isRecurringOccurrence(event.id);
 
     if (isRecurring) {
@@ -480,6 +801,10 @@ class _CalendarViewState extends ConsumerState<CalendarView>
       } else {
         await _viewModel.deleteEvent(event.id);
       }
+      await widget.reminderService?.cancelEvent(
+        EventReminderService.keyForEvent(event),
+        eventId: deleteSeries ? null : event.id,
+      );
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -732,8 +1057,10 @@ class _CalendarViewState extends ConsumerState<CalendarView>
                         itemBuilder: (context, index) {
                           final event = events[index];
                           return EventTile(
+                            key: _eventTileKey(event),
                             event: event,
                             onDelete: () => _deleteEvent(event),
+                            onEdit: () => _showEditEventDialog(event),
                           );
                         },
                       ),
@@ -780,8 +1107,10 @@ class _CalendarViewState extends ConsumerState<CalendarView>
                         itemBuilder: (context, index) {
                           final event = entry.value[index];
                           return EventTile(
+                            key: _eventTileKey(event),
                             event: event,
                             onDelete: () => _deleteEvent(event),
+                            onEdit: () => _showEditEventDialog(event),
                           );
                         },
                       ),
@@ -801,9 +1130,7 @@ class _CalendarViewState extends ConsumerState<CalendarView>
 
 /// Modal bottom sheet widget for adding new events.
 ///
-/// Disposes its [TextEditingController] and [FocusNode] instances cleanly on exit,
-/// and defers keyboard focus until the entrance animation completes to avoid
-/// frame drops on Android.
+/// Disposes its text controllers when the sheet closes.
 class _AddEventBottomSheet extends StatefulWidget {
   const _AddEventBottomSheet({
     required this.selectedDate,
@@ -813,6 +1140,9 @@ class _AddEventBottomSheet extends StatefulWidget {
     required this.categoriesForCalendar,
     required this.deviceCalendars,
     this.initialEvent,
+    this.editingEvent,
+    this.updateSeries = false,
+    this.initialReminderMinutesBefore,
     required this.onSave,
   });
 
@@ -823,6 +1153,9 @@ class _AddEventBottomSheet extends StatefulWidget {
   final List<EventCategory> Function(String calendarId) categoriesForCalendar;
   final List<DeviceCalendarInfo> deviceCalendars;
   final ExternalCalendarEvent? initialEvent;
+  final CalendarEvent? editingEvent;
+  final bool updateSeries;
+  final int? initialReminderMinutesBefore;
   final Future<void> Function({
     required String title,
     required String description,
@@ -835,6 +1168,7 @@ class _AddEventBottomSheet extends StatefulWidget {
     required bool isAllDay,
     required RecurrenceFrequency? recurrenceFrequency,
     required DateTime? recurrenceEndDate,
+    required int? reminderMinutesBefore,
   })
   onSave;
 
@@ -845,28 +1179,30 @@ class _AddEventBottomSheet extends StatefulWidget {
 class _AddEventBottomSheetState extends State<_AddEventBottomSheet> {
   late final TextEditingController _titleController;
   late final TextEditingController _descriptionController;
-  late final FocusNode _titleFocusNode;
   TimeOfDay _startTime = const TimeOfDay(hour: 9, minute: 0);
   TimeOfDay _endTime = const TimeOfDay(hour: 10, minute: 0);
+  int _endDateOffset = 0;
   bool _isAllDay = false;
   RecurrenceFrequency? _recurrenceFrequency;
   DateTime? _recurrenceEndDate;
   late String _selectedCalendarId;
   String? _selectedCategoryId;
+  int? _reminderMinutesBefore;
   bool _isSaving = false;
   String? _saveError;
-  Animation<double>? _routeAnimation;
 
   @override
   void initState() {
     super.initState();
     _titleController = TextEditingController(
-      text: widget.initialEvent?.title ?? '',
+      text: widget.editingEvent?.title ?? widget.initialEvent?.title ?? '',
     );
     _descriptionController = TextEditingController(
-      text: widget.initialEvent?.description ?? '',
+      text:
+          widget.editingEvent?.description ??
+          widget.initialEvent?.description ??
+          '',
     );
-    _titleFocusNode = FocusNode();
     final destination = widget.initialCalendarDestination;
     final hasAvailableDeviceCalendar =
         destination.startsWith('device:') &&
@@ -877,43 +1213,43 @@ class _AddEventBottomSheetState extends State<_AddEventBottomSheet> {
     _selectedCalendarId = hasAvailableDeviceCalendar
         ? destination
         : 'local:${widget.initialCalendar.id}';
-    _isAllDay = widget.initialEvent?.isAllDay ?? false;
-    if (widget.initialEvent != null && !_isAllDay) {
-      _startTime = TimeOfDay.fromDateTime(widget.initialEvent!.startTime);
-      _endTime = TimeOfDay.fromDateTime(widget.initialEvent!.endTime);
+    final event = widget.editingEvent;
+    final initialStartTime = event?.startTime ?? widget.initialEvent?.startTime;
+    final initialEndTime = event?.endTime ?? widget.initialEvent?.endTime;
+    _isAllDay = event?.isAllDay ?? widget.initialEvent?.isAllDay ?? false;
+    _selectedCategoryId = event?.categoryId;
+    _reminderMinutesBefore = widget.initialReminderMinutesBefore;
+    if (event != null || widget.initialEvent != null) {
+      _recurrenceFrequency =
+          event?.recurrenceFrequency ??
+          widget.initialEvent?.recurrenceFrequency;
+      _recurrenceEndDate =
+          event?.recurrenceEndDate ?? widget.initialEvent?.recurrenceEndDate;
     }
-
-    // Defer focusing the title TextField until after the bottom sheet's
-    // entrance animation completes. This prevents Android's software keyboard
-    // from opening mid-transition, which causes severe frame drops and jank.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final route = ModalRoute.of(context);
-      if (route != null && route.animation != null) {
-        _routeAnimation = route.animation;
-        if (_routeAnimation!.isCompleted) {
-          _titleFocusNode.requestFocus();
-        } else {
-          _routeAnimation!.addStatusListener(_handleAnimationStatus);
-        }
-      }
-    });
-  }
-
-  void _handleAnimationStatus(AnimationStatus status) {
-    if (status == AnimationStatus.completed) {
-      if (mounted) {
-        _titleFocusNode.requestFocus();
-      }
-      _routeAnimation?.removeStatusListener(_handleAnimationStatus);
+    if (initialStartTime != null && initialEndTime != null && !_isAllDay) {
+      _startTime = TimeOfDay.fromDateTime(initialStartTime);
+      _endTime = TimeOfDay.fromDateTime(initialEndTime);
+      _endDateOffset =
+          DateTime(
+                initialEndTime.year,
+                initialEndTime.month,
+                initialEndTime.day,
+              )
+              .difference(
+                DateTime(
+                  initialStartTime.year,
+                  initialStartTime.month,
+                  initialStartTime.day,
+                ),
+              )
+              .inDays;
     }
   }
 
   @override
   void dispose() {
-    _routeAnimation?.removeStatusListener(_handleAnimationStatus);
     _titleController.dispose();
     _descriptionController.dispose();
-    _titleFocusNode.dispose();
     super.dispose();
   }
 
@@ -951,7 +1287,7 @@ class _AddEventBottomSheetState extends State<_AddEventBottomSheet> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              l10n.addEvent,
+              widget.editingEvent == null ? l10n.addEvent : l10n.editEvent,
               style: theme.textTheme.headlineSmall?.copyWith(
                 fontWeight: FontWeight.bold,
               ),
@@ -966,7 +1302,6 @@ class _AddEventBottomSheetState extends State<_AddEventBottomSheet> {
             const SizedBox(height: 16),
             TextField(
               controller: _titleController,
-              focusNode: _titleFocusNode,
               onChanged: (_) => setState(() {}),
               decoration: InputDecoration(
                 labelText: l10n.eventTitle,
@@ -1017,7 +1352,7 @@ class _AddEventBottomSheetState extends State<_AddEventBottomSheet> {
                   ),
                 ),
               ],
-              onChanged: _isSaving
+              onChanged: _isSaving || widget.editingEvent != null
                   ? null
                   : (calendarId) {
                       if (calendarId != null) {
@@ -1068,8 +1403,11 @@ class _AddEventBottomSheetState extends State<_AddEventBottomSheet> {
                           setState(() => _selectedCategoryId = categoryId),
               ),
             ],
-            if (selectedLocalCalendar != null ||
-                _selectedCalendarId.startsWith('device:')) ...[
+            if (widget.editingEvent?.isDeviceCalendarEvent != true &&
+                !(widget.editingEvent?.isRecurring == true &&
+                    !widget.updateSeries) &&
+                (selectedLocalCalendar != null ||
+                    _selectedCalendarId.startsWith('device:'))) ...[
               const SizedBox(height: 12),
               DropdownButtonFormField<RecurrenceFrequency?>(
                 key: const ValueKey('event-recurrence-dropdown'),
@@ -1137,6 +1475,55 @@ class _AddEventBottomSheetState extends State<_AddEventBottomSheet> {
                 ),
               ],
             ],
+            const SizedBox(height: 12),
+            DropdownButtonFormField<int?>(
+              key: const ValueKey('event-reminder-dropdown'),
+              initialValue: _reminderMinutesBefore,
+              isExpanded: true,
+              decoration: InputDecoration(
+                labelText: l10n.eventReminder,
+                border: const OutlineInputBorder(),
+                prefixIcon: const Icon(Icons.notifications_outlined),
+              ),
+              items: [
+                DropdownMenuItem<int?>(
+                  value: null,
+                  child: Text(l10n.noReminder),
+                ),
+                DropdownMenuItem<int?>(
+                  value: 15,
+                  child: Text(l10n.reminder15Minutes),
+                ),
+                DropdownMenuItem<int?>(
+                  value: 30,
+                  child: Text(l10n.reminder30Minutes),
+                ),
+                DropdownMenuItem<int?>(
+                  value: 60,
+                  child: Text(l10n.reminder1Hour),
+                ),
+                DropdownMenuItem<int?>(
+                  value: 180,
+                  child: Text(l10n.reminder3Hours),
+                ),
+                DropdownMenuItem<int?>(
+                  value: 360,
+                  child: Text(l10n.reminder6Hours),
+                ),
+                DropdownMenuItem<int?>(
+                  value: 720,
+                  child: Text(l10n.reminder12Hours),
+                ),
+                DropdownMenuItem<int?>(
+                  value: 1440,
+                  child: Text(l10n.reminder24Hours),
+                ),
+              ],
+              onChanged: _isSaving
+                  ? null
+                  : (minutes) =>
+                        setState(() => _reminderMinutesBefore = minutes),
+            ),
             if (_saveError != null) ...[
               const SizedBox(height: 8),
               Text(
@@ -1168,7 +1555,17 @@ class _AddEventBottomSheetState extends State<_AddEventBottomSheet> {
                           initialTime: _startTime,
                         );
                         if (picked != null) {
-                          setState(() => _startTime = picked);
+                          final endMinutes =
+                              picked.hour * 60 + picked.minute + 60;
+                          setState(() {
+                            _startTime = picked;
+                            _endDateOffset = endMinutes ~/ (24 * 60);
+                            final minutesInDay = endMinutes % (24 * 60);
+                            _endTime = TimeOfDay(
+                              hour: minutesInDay ~/ 60,
+                              minute: minutesInDay % 60,
+                            );
+                          });
                         }
                       },
                     ),
@@ -1184,7 +1581,14 @@ class _AddEventBottomSheetState extends State<_AddEventBottomSheet> {
                           initialTime: _endTime,
                         );
                         if (picked != null) {
-                          setState(() => _endTime = picked);
+                          setState(() {
+                            _endTime = picked;
+                            _endDateOffset =
+                                picked.hour * 60 + picked.minute <
+                                    _startTime.hour * 60 + _startTime.minute
+                                ? 1
+                                : 0;
+                          });
                         }
                       },
                     ),
@@ -1212,13 +1616,14 @@ class _AddEventBottomSheetState extends State<_AddEventBottomSheet> {
                         );
                         final endDateTime = _isAllDay
                             ? DateTime(date.year, date.month, date.day + 1)
-                            : DateTime(
-                                date.year,
-                                date.month,
-                                date.day,
-                                _endTime.hour,
-                                _endTime.minute,
-                              );
+                            : DateTime(date.year, date.month, date.day)
+                                  .add(Duration(days: _endDateOffset))
+                                  .add(
+                                    Duration(
+                                      hours: _endTime.hour,
+                                      minutes: _endTime.minute,
+                                    ),
+                                  );
                         Color? selectedCategoryColor;
                         for (final category in categories) {
                           if (category.id == _selectedCategoryId) {
@@ -1250,6 +1655,7 @@ class _AddEventBottomSheetState extends State<_AddEventBottomSheet> {
                             isAllDay: _isAllDay,
                             recurrenceFrequency: _recurrenceFrequency,
                             recurrenceEndDate: _recurrenceEndDate,
+                            reminderMinutesBefore: _reminderMinutesBefore,
                           );
                           if (!mounted) return;
                           navigator.pop();
@@ -1261,7 +1667,11 @@ class _AddEventBottomSheetState extends State<_AddEventBottomSheet> {
                           if (mounted) setState(() => _isSaving = false);
                         }
                       },
-                child: Text(l10n.saveEvent),
+                child: Text(
+                  widget.editingEvent == null
+                      ? l10n.saveEvent
+                      : l10n.saveEventChanges,
+                ),
               ),
             ),
           ],

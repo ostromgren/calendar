@@ -21,6 +21,7 @@ class CalendarEvent {
     this.isDeviceCalendarEvent = false,
     this.recurrenceFrequency,
     this.recurrenceEndDate,
+    this.reminderMinutesBefore,
     this.excludedOccurrenceDates = const [],
     bool? isRecurring,
   }) : isRecurring = isRecurring ?? (recurrenceFrequency != null);
@@ -38,6 +39,7 @@ class CalendarEvent {
   final bool isDeviceCalendarEvent;
   final RecurrenceFrequency? recurrenceFrequency;
   final DateTime? recurrenceEndDate;
+  final int? reminderMinutesBefore;
   final List<String> excludedOccurrenceDates;
   final bool isRecurring;
 
@@ -60,6 +62,7 @@ class CalendarEvent {
     'color': color.toARGB32(),
     'recurrenceFrequency': recurrenceFrequency?.name,
     'recurrenceEndDate': recurrenceEndDate?.toIso8601String(),
+    'reminderMinutesBefore': reminderMinutesBefore,
     'excludedOccurrenceDates': excludedOccurrenceDates,
     'isRecurring': isRecurring,
   };
@@ -80,6 +83,7 @@ class CalendarEvent {
     recurrenceEndDate: json['recurrenceEndDate'] == null
         ? null
         : DateTime.parse(json['recurrenceEndDate'] as String),
+    reminderMinutesBefore: json['reminderMinutesBefore'] as int?,
     excludedOccurrenceDates:
         (json['excludedOccurrenceDates'] as List<dynamic>?)?.cast<String>() ??
         const [],
@@ -103,6 +107,7 @@ class CalendarEvent {
     bool? isDeviceCalendarEvent,
     RecurrenceFrequency? recurrenceFrequency,
     DateTime? recurrenceEndDate,
+    int? reminderMinutesBefore,
     List<String>? excludedOccurrenceDates,
     bool? isRecurring,
   }) {
@@ -121,6 +126,8 @@ class CalendarEvent {
           isDeviceCalendarEvent ?? this.isDeviceCalendarEvent,
       recurrenceFrequency: recurrenceFrequency ?? this.recurrenceFrequency,
       recurrenceEndDate: recurrenceEndDate ?? this.recurrenceEndDate,
+      reminderMinutesBefore:
+          reminderMinutesBefore ?? this.reminderMinutesBefore,
       excludedOccurrenceDates:
           excludedOccurrenceDates ?? this.excludedOccurrenceDates,
       isRecurring: isRecurring ?? this.isRecurring,

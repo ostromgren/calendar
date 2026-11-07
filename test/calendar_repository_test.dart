@@ -75,6 +75,27 @@ void main() {
     expect(restored.excludedOccurrenceDates, ['2026-01-26']);
   });
 
+  test('event reminder settings persist and old events default to none', () {
+    final event = CalendarEvent(
+      id: 'reminder',
+      title: 'Reminded event',
+      startTime: DateTime(2026, 1, 5, 9),
+      endTime: DateTime(2026, 1, 5, 10),
+      reminderMinutesBefore: 30,
+    );
+
+    final restored = CalendarEvent.fromJson(event.toJson());
+    final oldEvent = CalendarEvent.fromJson({
+      'id': 'old',
+      'title': 'Old event',
+      'startTime': '2026-01-05T09:00:00.000',
+      'endTime': '2026-01-05T10:00:00.000',
+    });
+
+    expect(restored.reminderMinutesBefore, 30);
+    expect(oldEvent.reminderMinutesBefore, isNull);
+  });
+
   test('deleting an occurrence can remove the entire recurring series', () {
     final event = CalendarEvent(
       id: 'series',
@@ -92,4 +113,45 @@ void main() {
     expect(repository.getAllEvents(), isEmpty);
     expect(repository.getEventsForDay(DateTime(2026, 1, 19)), isEmpty);
   });
+
+  test(
+    'editing one recurring occurrence leaves the rest of the series intact',
+    () {
+      final event = CalendarEvent(
+        id: 'series',
+        title: 'Weekly event',
+        startTime: DateTime(2026, 1, 5, 9),
+        endTime: DateTime(2026, 1, 5, 10),
+        recurrenceFrequency: RecurrenceFrequency.weekly,
+        recurrenceEndDate: DateTime(2026, 2, 2),
+      );
+      final repository = CalendarRepository(initialEvents: [event]);
+      final occurrence = repository
+          .getEventsForDay(DateTime(2026, 1, 12))
+          .single;
+
+      expect(
+        repository.updateEvent(
+          CalendarEvent(
+            id: occurrence.id,
+            title: 'Moved event',
+            startTime: DateTime(2026, 1, 12, 11),
+            endTime: DateTime(2026, 1, 12, 12),
+          ),
+          updateSeries: false,
+        ),
+        isTrue,
+      );
+
+      expect(
+        repository.getEventsForDay(DateTime(2026, 1, 12)).single.title,
+        'Moved event',
+      );
+      expect(
+        repository.getEventsForDay(DateTime(2026, 1, 19)).single.title,
+        'Weekly event',
+      );
+      expect(repository.getAllEvents(), hasLength(2));
+    },
+  );
 }

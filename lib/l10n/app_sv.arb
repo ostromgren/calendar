@@ -17,6 +17,10 @@
   "eventCount": "{count, plural, =1{1 händelse} other{{count} händelser}}",
   "noEventsScheduled": "Inga händelser schemalagda",
   "addEvent": "Lägg till händelse",
+  "editEvent": "Redigera händelse",
+  "editRecurringEventTitle": "Redigera återkommande händelse?",
+  "editRecurringEventConfirmation": "Välj om bara den här händelsen eller hela serien ska redigeras.",
+  "saveEventChanges": "Spara ändringar",
   "forDate": "För {date}",
   "eventTitle": "Händelsens titel",
   "required": "Obligatorisk",
@@ -95,6 +99,23 @@
   "endTime": "Slut: {time}",
   "saveEvent": "Spara händelse",
   "wholeDay": "Hela dagen",
+  "eventReminder": "Påminnelse",
+  "noReminder": "Ingen",
+  "reminder15Minutes": "15 minuter före",
+  "reminder30Minutes": "30 minuter före",
+  "reminder1Hour": "1 timme före",
+  "reminder3Hours": "3 timmar före",
+  "reminder6Hours": "6 timmar före",
+  "reminder12Hours": "12 timmar före",
+  "reminder24Hours": "24 timmar före",
+  "eventStartsAt": "Börjar kl. {time}",
+  "@eventStartsAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
   "invalidCalendarFile": "Inga kalenderhändelser hittades i den valda filen.",
   "calendarFileReadError": "Det gick inte att läsa den valda kalenderfilen: {error}",
   "deleteEvent": "Ta bort händelse",

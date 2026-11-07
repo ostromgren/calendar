@@ -25,6 +25,10 @@
   },
   "noEventsScheduled": "No events scheduled",
   "addEvent": "Add Event",
+  "editEvent": "Edit Event",
+  "editRecurringEventTitle": "Edit recurring event?",
+  "editRecurringEventConfirmation": "Choose whether to edit only this event or the entire series.",
+  "saveEventChanges": "Save Changes",
   "forDate": "For {date}",
   "@forDate": {
     "placeholders": {
@@ -131,6 +135,23 @@
   },
   "saveEvent": "Save Event",
   "wholeDay": "Whole day",
+  "eventReminder": "Reminder",
+  "noReminder": "None",
+  "reminder15Minutes": "15 minutes before",
+  "reminder30Minutes": "30 minutes before",
+  "reminder1Hour": "1 hour before",
+  "reminder3Hours": "3 hours before",
+  "reminder6Hours": "6 hours before",
+  "reminder12Hours": "12 hours before",
+  "reminder24Hours": "24 hours before",
+  "eventStartsAt": "Starts at {time}",
+  "@eventStartsAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
   "invalidCalendarFile": "No calendar events were found in the selected file.",
   "calendarFileReadError": "Unable to read the selected calendar file: {error}",
   "@calendarFileReadError": {

@@ -5,10 +5,16 @@ import 'package:calendar/l10n/generated/app_localizations.dart';
 
 /// Renders a single event card in the daily schedule view.
 class EventTile extends StatefulWidget {
-  const EventTile({super.key, required this.event, required this.onDelete});
+  const EventTile({
+    super.key,
+    required this.event,
+    required this.onDelete,
+    required this.onEdit,
+  });
 
   final CalendarEvent event;
   final VoidCallback onDelete;
+  final VoidCallback onEdit;
 
   @override
   State<EventTile> createState() => _EventTileState();
@@ -113,17 +119,34 @@ class _EventTileState extends State<EventTile> {
               ),
             ),
             if (!event.readOnly)
-              IconButton(
-                key: const ValueKey('event-delete-button'),
-                visualDensity: VisualDensity.compact,
-                constraints: const BoxConstraints.tightFor(
-                  width: 40,
-                  height: 40,
-                ),
-                padding: EdgeInsets.zero,
-                icon: const Icon(Icons.delete_outline, size: 20),
-                tooltip: l10n.deleteEvent,
-                onPressed: widget.onDelete,
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    key: const ValueKey('event-edit-button'),
+                    visualDensity: VisualDensity.compact,
+                    constraints: const BoxConstraints.tightFor(
+                      width: 40,
+                      height: 40,
+                    ),
+                    padding: EdgeInsets.zero,
+                    icon: const Icon(Icons.edit_outlined, size: 20),
+                    tooltip: l10n.editEvent,
+                    onPressed: widget.onEdit,
+                  ),
+                  IconButton(
+                    key: const ValueKey('event-delete-button'),
+                    visualDensity: VisualDensity.compact,
+                    constraints: const BoxConstraints.tightFor(
+                      width: 40,
+                      height: 40,
+                    ),
+                    padding: EdgeInsets.zero,
+                    icon: const Icon(Icons.delete_outline, size: 20),
+                    tooltip: l10n.deleteEvent,
+                    onPressed: widget.onDelete,
+                  ),
+                ],
               ),
           ],
         ),

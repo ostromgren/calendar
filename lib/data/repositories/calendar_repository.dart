@@ -72,6 +72,10 @@ class CalendarRepository {
               color: event.color,
               readOnly: event.readOnly,
               isDeviceCalendarEvent: event.isDeviceCalendarEvent,
+              recurrenceFrequency: event.recurrenceFrequency,
+              recurrenceEndDate: event.recurrenceEndDate,
+              reminderMinutesBefore: event.reminderMinutesBefore,
+              excludedOccurrenceDates: event.excludedOccurrenceDates,
               isRecurring: true,
             ),
           );
@@ -85,6 +89,68 @@ class CalendarRepository {
 
   void addEvent(CalendarEvent event) {
     _events.add(event);
+  }
+
+  bool updateEvent(CalendarEvent event, {required bool updateSeries}) {
+    final existingIndex = _events.indexWhere(
+      (storedEvent) => storedEvent.id == event.id,
+    );
+    if (existingIndex >= 0) {
+      _events[existingIndex] = event;
+      return true;
+    }
+
+    final separator = event.id.indexOf('::');
+    if (separator < 0) return false;
+    final seriesId = event.id.substring(0, separator);
+    final seriesIndex = _events.indexWhere(
+      (storedEvent) => storedEvent.id == seriesId,
+    );
+    if (seriesIndex < 0 || _events[seriesIndex].recurrenceFrequency == null) {
+      return false;
+    }
+
+    final series = _events[seriesIndex];
+    if (updateSeries) {
+      _events[seriesIndex] = CalendarEvent(
+        id: series.id,
+        title: event.title,
+        description: event.description,
+        calendarId: event.calendarId,
+        categoryId: event.categoryId,
+        startTime: event.startTime,
+        endTime: event.endTime,
+        isAllDay: event.isAllDay,
+        color: event.color,
+        recurrenceFrequency: series.recurrenceFrequency,
+        recurrenceEndDate: series.recurrenceEndDate,
+        reminderMinutesBefore: event.reminderMinutesBefore,
+        excludedOccurrenceDates: series.excludedOccurrenceDates,
+      );
+      return true;
+    }
+
+    final dateKey = event.id.substring(separator + 2);
+    _events[seriesIndex] = series.copyWith(
+      excludedOccurrenceDates: series.excludedOccurrenceDates.contains(dateKey)
+          ? series.excludedOccurrenceDates
+          : [...series.excludedOccurrenceDates, dateKey],
+    );
+    _events.add(
+      CalendarEvent(
+        id: event.id,
+        title: event.title,
+        description: event.description,
+        calendarId: event.calendarId,
+        categoryId: event.categoryId,
+        startTime: event.startTime,
+        endTime: event.endTime,
+        isAllDay: event.isAllDay,
+        color: event.color,
+        reminderMinutesBefore: event.reminderMinutesBefore,
+      ),
+    );
+    return true;
   }
 
   bool deleteEvent(String id) {

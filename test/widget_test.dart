@@ -73,6 +73,38 @@ void main() {
     expect(tester.widget<FilledButton>(saveButton).onPressed, isNotNull);
   });
 
+  testWidgets('changing the start time keeps the default one-hour duration', (
+    tester,
+  ) async {
+    final (viewModel, themeViewModel, settings) = await buildViewModels();
+
+    await tester.pumpWidget(
+      createCalendarTestApp(
+        settingsRepository: settings,
+        calendarViewModel: viewModel,
+        themeViewModel: themeViewModel,
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('New Event'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Start: 9:00 AM'));
+    await tester.pumpAndSettle();
+    final picker = find.byType(TimePickerDialog);
+    await tester.tap(find.byTooltip('Switch to text input mode'));
+    await tester.pumpAndSettle();
+    final hourInput = find
+        .descendant(of: picker, matching: find.byType(EditableText))
+        .first;
+    await tester.enterText(hourInput, '11');
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Start: 11:00 AM'), findsOneWidget);
+    expect(find.text('End: 12:00 PM'), findsOneWidget);
+  });
+
   testWidgets('Calendar app renders header, grid, and event button', (
     tester,
   ) async {
@@ -106,6 +138,8 @@ void main() {
     // Verify the modal sheet appears with the Add Event header
     expect(find.text('Add Event'), findsOneWidget);
     expect(find.text('Save Event'), findsOneWidget);
+    expect(find.text('End: 10:00 AM'), findsOneWidget);
+    expect(find.text('None'), findsOneWidget);
 
     // Enter title and save
     await tester.enterText(
@@ -119,6 +153,19 @@ void main() {
     await tester.tap(calendarDropdown);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Personal').last);
+    await tester.pumpAndSettle();
+    final reminderDropdown = find.byKey(
+      const ValueKey('event-reminder-dropdown'),
+    );
+    await tester.ensureVisible(reminderDropdown);
+    await tester.tap(reminderDropdown);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('15 minutes before').last);
+    await tester.pumpAndSettle();
+    expect(find.text('15 minutes before'), findsOneWidget);
+    await tester.tap(reminderDropdown);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('None').last);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Save Event'));
     await tester.pumpAndSettle();
@@ -156,6 +203,55 @@ void main() {
       scrollable: find.byType(Scrollable).first,
     );
     expect(find.text('Test Meeting'), findsOneWidget);
+  });
+
+  testWidgets('editing a local event persists its changed details', (
+    tester,
+  ) async {
+    final (viewModel, themeViewModel, settings) = await buildViewModels();
+    final date = viewModel.selectedDate;
+    await viewModel.addEvent(
+      title: 'Planning',
+      description: 'Original details',
+      startTime: DateTime(date.year, date.month, date.day, 9),
+      endTime: DateTime(date.year, date.month, date.day, 10),
+      calendar: viewModel.lastUsedCalendar,
+    );
+
+    await tester.pumpWidget(
+      createCalendarTestApp(
+        settingsRepository: settings,
+        calendarViewModel: viewModel,
+        themeViewModel: themeViewModel,
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('Planning'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    final editButton = find.byKey(const ValueKey('event-edit-button'));
+    await tester.ensureVisible(editButton);
+    await tester.pumpAndSettle();
+    expect(tester.widget<IconButton>(editButton).onPressed, isNotNull);
+    await tester.tap(editButton);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Edit Event'), findsOneWidget);
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Event Title'),
+      'Updated planning',
+    );
+    await tester.ensureVisible(find.text('Save Changes'));
+    await tester.tap(find.text('Save Changes'));
+    await tester.pumpAndSettle();
+
+    expect(
+      viewModel.repository.getAllEvents().single.title,
+      'Updated planning',
+    );
+    expect(find.text('Updated planning'), findsOneWidget);
   });
 
   testWidgets('long Swedish greeting scales to fit in the app bar', (

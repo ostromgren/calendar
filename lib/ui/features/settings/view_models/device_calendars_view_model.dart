@@ -146,6 +146,39 @@ class DeviceCalendarsViewModel extends ChangeNotifier {
     await refreshEvents();
   }
 
+  Future<void> updateEvent({
+    required String eventId,
+    required String title,
+    required DateTime start,
+    required DateTime end,
+    required String description,
+    required bool isAllDay,
+    required bool updateSeries,
+  }) async {
+    const prefix = 'device:';
+    final calendar = _calendars.where(
+      (item) => item.id == _eventCalendarId(eventId),
+    );
+    if (!eventId.startsWith(prefix) ||
+        !_hasPermission ||
+        calendar.isEmpty ||
+        calendar.first.readOnly ||
+        title.trim().isEmpty ||
+        end.isBefore(start)) {
+      throw StateError('Cannot update this device calendar event.');
+    }
+    await repository.updateEvent(
+      instanceId: eventId.substring(prefix.length),
+      title: title.trim(),
+      start: start,
+      end: end,
+      description: description,
+      isAllDay: isAllDay,
+      updateSeries: updateSeries,
+    );
+    await refreshEvents();
+  }
+
   Future<void> deleteEventSeries(String eventId) async {
     const prefix = 'device:';
     if (!eventId.startsWith(prefix) || !_hasPermission) {
@@ -153,6 +186,14 @@ class DeviceCalendarsViewModel extends ChangeNotifier {
     }
     await repository.deleteEventSeries(eventId.substring(prefix.length));
     await refreshEvents();
+  }
+
+  String _eventCalendarId(String eventId) {
+    return _events
+            .where((event) => event.id == eventId)
+            .map((event) => event.calendarId)
+            .firstOrNull ??
+        '';
   }
 
   Future<void> _loadCalendars() async {

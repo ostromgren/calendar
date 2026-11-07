@@ -42,14 +42,14 @@ class _FakeDeviceCalendarRepository implements DeviceCalendarRepository {
     DateTime start,
     DateTime end,
     List<String> calendarIds,
-  ) async =>
-      events.where((e) => calendarIds.contains(e.calendarId)).toList();
+  ) async => events.where((e) => calendarIds.contains(e.calendarId)).toList();
 
   String? createdCalendarId;
   RecurrenceFrequency? createdRecurrenceFrequency;
   DateTime? createdRecurrenceEndDate;
   final deletedInstanceIds = <String>[];
   final deletedSeriesInstanceIds = <String>[];
+  final updatedInstanceIds = <String>[];
 
   @override
   Future<void> createEvent({
@@ -89,6 +89,31 @@ class _FakeDeviceCalendarRepository implements DeviceCalendarRepository {
   Future<void> deleteEvent(String instanceId) async {
     deletedInstanceIds.add(instanceId);
     events.removeWhere((e) => e.id == 'device:$instanceId');
+  }
+
+  @override
+  Future<void> updateEvent({
+    required String instanceId,
+    required String title,
+    required DateTime start,
+    required DateTime end,
+    required String description,
+    required bool isAllDay,
+    required bool updateSeries,
+  }) async {
+    updatedInstanceIds.add(instanceId);
+    final index = events.indexWhere(
+      (event) => event.id == 'device:$instanceId',
+    );
+    if (index >= 0) {
+      events[index] = events[index].copyWith(
+        title: title,
+        description: description,
+        startTime: start,
+        endTime: end,
+        isAllDay: isAllDay,
+      );
+    }
   }
 
   @override
@@ -323,13 +348,66 @@ void main() {
       await tester.tap(find.text('Entire series'));
       await tester.pumpAndSettle();
 
-      expect(
-        repository.deletedSeriesInstanceIds,
-        ['recurring-ev@${now.millisecondsSinceEpoch}'],
-      );
+      expect(repository.deletedSeriesInstanceIds, [
+        'recurring-ev@${now.millisecondsSinceEpoch}',
+      ]);
       expect(find.text('Recurring Standup'), findsNothing);
     },
   );
+
+  testWidgets('editable device calendar event updates through its repository', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(360, 800);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final now = DateTime.now();
+    final repository = _FakeDeviceCalendarRepository();
+    repository._hasPermission = true;
+    repository.events.add(
+      CalendarEvent(
+        id: 'device:editable-event',
+        title: 'Synced event',
+        calendarId: 'google-primary',
+        startTime: DateTime(now.year, now.month, now.day, 10),
+        endTime: DateTime(now.year, now.month, now.day, 11),
+        readOnly: false,
+        isDeviceCalendarEvent: true,
+      ),
+    );
+    final (calendarViewModel, themeViewModel, deviceCalendarsViewModel) =
+        await createViewModels(repository);
+    await deviceCalendarsViewModel.load();
+
+    await tester.pumpWidget(
+      createCalendarTestApp(
+        settingsRepository: deviceCalendarsViewModel.settingsRepository,
+        calendarViewModel: calendarViewModel,
+        themeViewModel: themeViewModel,
+        deviceCalendarsViewModel: deviceCalendarsViewModel,
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('event-edit-button')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Event Title'),
+      'Updated synced event',
+    );
+    await tester.ensureVisible(find.text('Save Changes'));
+    await tester.tap(find.text('Save Changes'));
+    await tester.pumpAndSettle();
+
+    expect(repository.updatedInstanceIds, ['editable-event']);
+    expect(
+      repository.events
+          .singleWhere((event) => event.id == 'device:editable-event')
+          .title,
+      'Updated synced event',
+    );
+  });
 
   testWidgets(
     'non-recurring event on device calendar shows synced deletion confirmation',

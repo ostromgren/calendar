@@ -40,6 +40,8 @@ class _FakeDeviceCalendarRepository implements DeviceCalendarRepository {
   String? createdCalendarId;
   RecurrenceFrequency? createdRecurrenceFrequency;
   DateTime? createdRecurrenceEndDate;
+  String? updatedEventId;
+  String? updatedTitle;
   final deletedInstanceIds = <String>[];
   final deletedSeriesInstanceIds = <String>[];
 
@@ -94,6 +96,20 @@ class _FakeDeviceCalendarRepository implements DeviceCalendarRepository {
   Future<void> deleteEvent(String instanceId) async {
     deletedInstanceIds.add(instanceId);
     events.removeWhere((event) => event.id == 'device:$instanceId');
+  }
+
+  @override
+  Future<void> updateEvent({
+    required String instanceId,
+    required String title,
+    required DateTime start,
+    required DateTime end,
+    required String description,
+    required bool isAllDay,
+    required bool updateSeries,
+  }) async {
+    updatedEventId = instanceId;
+    updatedTitle = title;
   }
 
   @override
@@ -264,9 +280,6 @@ void main() {
     await viewModel.deleteEventSeries('device:recurring-1@1700000000000');
 
     expect(repository.deletedSeriesInstanceIds, ['recurring-1@1700000000000']);
-    expect(
-      viewModel.events.where((e) => e.title == 'Weekly Standup'),
-      isEmpty,
-    );
+    expect(viewModel.events.where((e) => e.title == 'Weekly Standup'), isEmpty);
   });
 }

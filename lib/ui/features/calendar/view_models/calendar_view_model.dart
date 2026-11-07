@@ -7,6 +7,7 @@ import 'package:calendar/domain/models/local_calendar.dart';
 import 'package:calendar/domain/models/recurrence_frequency.dart';
 import 'package:calendar/domain/models/starting_day_of_week.dart';
 import 'package:calendar/data/calendar_ics_service.dart';
+import 'package:calendar/data/event_reminder_service.dart';
 
 export 'package:calendar/domain/models/starting_day_of_week.dart';
 
@@ -22,6 +23,7 @@ class CalendarViewModel extends ChangeNotifier {
   CalendarViewModel({
     required this.repository,
     required SettingsRepository settingsRepository,
+    this.reminderService,
     StartingDayOfWeek? initialFirstDayOfWeek,
     bool? initialShowWeekNumbers,
   }) : _settings = settingsRepository,
@@ -39,6 +41,7 @@ class CalendarViewModel extends ChangeNotifier {
 
   final CalendarRepository repository;
   final SettingsRepository _settings;
+  final EventReminderService? reminderService;
 
   late DateTime _selectedDate;
   late DateTime _focusedMonth;
@@ -301,9 +304,11 @@ class CalendarViewModel extends ChangeNotifier {
     bool isAllDay = false,
     RecurrenceFrequency? recurrenceFrequency,
     DateTime? recurrenceEndDate,
+    int? reminderMinutesBefore,
+    String? reminderBody,
   }) async {
     final newEvent = CalendarEvent(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      id: DateTime.now().microsecondsSinceEpoch.toString(),
       title: title,
       description: description,
       calendarId: calendar.id,
@@ -314,12 +319,29 @@ class CalendarViewModel extends ChangeNotifier {
       color: categoryColor ?? Colors.blue,
       recurrenceFrequency: recurrenceFrequency,
       recurrenceEndDate: recurrenceEndDate,
+      reminderMinutesBefore: reminderMinutesBefore,
     );
+    var reminderScheduled = false;
+    if (reminderMinutesBefore != null) {
+      final service = reminderService;
+      if (service == null || reminderBody == null) {
+        throw StateError('Event reminders are not available.');
+      }
+      await service.scheduleEvent(
+        event: newEvent,
+        minutesBefore: reminderMinutesBefore,
+        body: reminderBody,
+      );
+      reminderScheduled = true;
+    }
     repository.addEvent(newEvent);
     try {
       await _settings.saveLocalEvents(repository.getAllEvents());
     } catch (_) {
       repository.deleteEvent(newEvent.id);
+      if (reminderScheduled) {
+        await reminderService!.cancelEvent(newEvent.id);
+      }
       rethrow;
     }
     _lastUsedCalendar = calendar;
@@ -329,6 +351,107 @@ class CalendarViewModel extends ChangeNotifier {
 
   Future<void> deleteEvent(String id) async {
     await _deleteEvent(id, repository.deleteEvent);
+  }
+
+  Future<void> updateEvent({
+    required CalendarEvent existingEvent,
+    required String title,
+    required String description,
+    required DateTime startTime,
+    required DateTime endTime,
+    required LocalCalendar calendar,
+    required String? categoryId,
+    required Color? categoryColor,
+    required bool isAllDay,
+    required RecurrenceFrequency? recurrenceFrequency,
+    required DateTime? recurrenceEndDate,
+    required int? reminderMinutesBefore,
+    required String? reminderBody,
+    required String? previousReminderBody,
+    required bool updateSeries,
+  }) async {
+    final isRecurringOccurrence =
+        existingEvent.isRecurring &&
+        repository.isRecurringOccurrence(existingEvent.id);
+    final updateId = isRecurringOccurrence && updateSeries
+        ? existingEvent.id.substring(0, existingEvent.id.indexOf('::'))
+        : existingEvent.id;
+    final updatedEvent = CalendarEvent(
+      id: updateId,
+      title: title,
+      description: description,
+      calendarId: calendar.id,
+      categoryId: categoryId,
+      startTime: startTime,
+      endTime: endTime,
+      isAllDay: isAllDay,
+      color: categoryColor ?? Colors.blue,
+      recurrenceFrequency: isRecurringOccurrence && !updateSeries
+          ? null
+          : recurrenceFrequency,
+      recurrenceEndDate: isRecurringOccurrence && !updateSeries
+          ? null
+          : recurrenceEndDate,
+      reminderMinutesBefore: reminderMinutesBefore,
+      excludedOccurrenceDates: existingEvent.excludedOccurrenceDates,
+    );
+
+    final previousEvents = repository.getAllEvents();
+    final reminderKey = EventReminderService.keyForEvent(existingEvent);
+    final reminderEventId = updateSeries ? null : existingEvent.id;
+    if (existingEvent.reminderMinutesBefore != null &&
+        reminderService == null) {
+      throw StateError('Event reminders are not available.');
+    }
+    await reminderService?.cancelEvent(reminderKey, eventId: reminderEventId);
+    if (!repository.updateEvent(updatedEvent, updateSeries: updateSeries)) {
+      final oldReminderMinutes = existingEvent.reminderMinutesBefore;
+      if (oldReminderMinutes != null &&
+          reminderService != null &&
+          previousReminderBody != null) {
+        await reminderService!.scheduleEvent(
+          event: existingEvent,
+          minutesBefore: oldReminderMinutes,
+          body: previousReminderBody,
+        );
+      }
+      throw StateError('Cannot update this local calendar event.');
+    }
+
+    try {
+      await _settings.saveLocalEvents(repository.getAllEvents());
+      if (reminderMinutesBefore != null) {
+        final service = reminderService;
+        if (service == null || reminderBody == null) {
+          throw StateError('Event reminders are not available.');
+        }
+        await service.scheduleEvent(
+          event: updatedEvent,
+          minutesBefore: reminderMinutesBefore,
+          body: reminderBody,
+        );
+      }
+    } catch (_) {
+      repository.replaceAllEvents(previousEvents);
+      await _settings.saveLocalEvents(previousEvents);
+      await reminderService?.cancelEvent(
+        EventReminderService.keyForEvent(updatedEvent),
+        eventId: reminderEventId,
+      );
+      final oldReminderMinutes = existingEvent.reminderMinutesBefore;
+      if (oldReminderMinutes != null &&
+          reminderService != null &&
+          previousReminderBody != null) {
+        await reminderService!.scheduleEvent(
+          event: existingEvent,
+          minutesBefore: oldReminderMinutes,
+          body: previousReminderBody,
+        );
+      }
+      rethrow;
+    }
+    _lastUsedCalendar = calendar;
+    notifyListeners();
   }
 
   Future<void> deleteEventSeries(String id) async {

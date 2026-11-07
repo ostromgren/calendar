@@ -49,6 +49,16 @@ abstract interface class DeviceCalendarRepository {
     DateTime? recurrenceEndDate,
   });
 
+  Future<void> updateEvent({
+    required String instanceId,
+    required String title,
+    required DateTime start,
+    required DateTime end,
+    required String description,
+    required bool isAllDay,
+    required bool updateSeries,
+  });
+
   Future<void> deleteEvent(String instanceId);
 
   Future<void> deleteEventSeries(String instanceId);
@@ -116,8 +126,10 @@ class NativeDeviceCalendarRepository implements DeviceCalendarRepository {
       calendarIds: calendarIds,
     );
     return events
-        .map(
-          (event) => CalendarEvent(
+        .map((event) {
+          final recurrenceFrequency = _frequencyForRule(event.recurrenceRule);
+          final recurrenceEnd = event.recurrenceRule?.end;
+          return CalendarEvent(
             id: 'device:${event.instanceId}',
             title: event.title,
             description: event.description ?? '',
@@ -128,10 +140,19 @@ class NativeDeviceCalendarRepository implements DeviceCalendarRepository {
             color: event.color ?? colors[event.calendarId] ?? Colors.blue,
             readOnly: readOnlyCalendars[event.calendarId] ?? true,
             isDeviceCalendarEvent: true,
-            isRecurring: event.isRecurring ||
+            recurrenceFrequency: recurrenceFrequency,
+            recurrenceEndDate: recurrenceEnd is UntilEnd
+                ? DateTime(
+                    recurrenceEnd.until.year,
+                    recurrenceEnd.until.month,
+                    recurrenceEnd.until.day,
+                  )
+                : null,
+            isRecurring:
+                event.isRecurring ||
                 InstanceIdParser.parse(event.instanceId).timestamp != null,
-          ),
-        )
+          );
+        })
         .toList(growable: false);
   }
 
@@ -162,6 +183,38 @@ class NativeDeviceCalendarRepository implements DeviceCalendarRepository {
   }
 
   @override
+  Future<void> updateEvent({
+    required String instanceId,
+    required String title,
+    required DateTime start,
+    required DateTime end,
+    required String description,
+    required bool isAllDay,
+    required bool updateSeries,
+  }) async {
+    if (updateSeries) {
+      await _deviceCalendar.updateRecurring(
+        instanceId,
+        EventSpan.allEvents,
+        title: title,
+        start: start,
+        duration: end.difference(start),
+        description: Patch.set(description),
+        isAllDay: isAllDay,
+      );
+    } else {
+      await _deviceCalendar.updateEvent(
+        instanceId: instanceId,
+        title: title,
+        startDate: start,
+        endDate: end,
+        description: Patch.set(description),
+        isAllDay: isAllDay,
+      );
+    }
+  }
+
+  @override
   Future<void> deleteEvent(String instanceId) =>
       _deviceCalendar.deleteEvent(instanceId: instanceId);
 
@@ -169,6 +222,14 @@ class NativeDeviceCalendarRepository implements DeviceCalendarRepository {
   Future<void> deleteEventSeries(String instanceId) =>
       _deviceCalendar.deleteRecurring(instanceId, EventSpan.allEvents);
 }
+
+RecurrenceFrequency? _frequencyForRule(RecurrenceRule? rule) => switch (rule) {
+  WeeklyRecurrence(interval: 1) => RecurrenceFrequency.weekly,
+  WeeklyRecurrence(interval: 2) => RecurrenceFrequency.everyTwoWeeks,
+  WeeklyRecurrence(interval: 3) => RecurrenceFrequency.everyThreeWeeks,
+  MonthlyRecurrence() => RecurrenceFrequency.monthly,
+  _ => null,
+};
 
 RecurrenceRule? _recurrenceRule(
   RecurrenceFrequency? frequency,
