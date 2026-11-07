@@ -29,6 +29,29 @@ void main() {
     await expectLater(EventReminderService().initialize(), completes);
   });
 
+  test('Android initialization uses the drawable resource name', () async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    AndroidFlutterLocalNotificationsPlugin.registerWith();
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(_notificationChannel, (call) async {
+          if (call.method == 'initialize') {
+            expect(
+              call.arguments,
+              containsPair('defaultIcon', 'ic_notification'),
+            );
+            return true;
+          }
+          return null;
+        });
+    addTearDown(() {
+      debugDefaultTargetPlatformOverride = null;
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(_notificationChannel, null);
+    });
+
+    await expectLater(EventReminderService().initialize(), completes);
+  });
+
   test('dismiss action does not route to the event', () {
     final target = EventReminderTarget(
       eventKey: 'event-1',

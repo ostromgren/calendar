@@ -80,7 +80,7 @@ class EventReminderService {
 
     final initialized = await _plugin.initialize(
       settings: InitializationSettings(
-        android: AndroidInitializationSettings('@drawable/ic_notification'),
+        android: AndroidInitializationSettings('ic_notification'),
         iOS: DarwinInitializationSettings(
           requestAlertPermission: false,
           requestBadgePermission: false,
