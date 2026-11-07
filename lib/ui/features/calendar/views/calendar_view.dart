@@ -1324,6 +1324,7 @@ class _AddEventBottomSheetState extends State<_AddEventBottomSheet> {
               key: const ValueKey('event-calendar-dropdown'),
               initialValue: _selectedCalendarId,
               isExpanded: true,
+              dropdownColor: theme.colorScheme.surfaceContainerHigh,
               decoration: InputDecoration(
                 labelText: l10n.saveToCalendar,
                 border: OutlineInputBorder(),
@@ -1371,6 +1372,7 @@ class _AddEventBottomSheetState extends State<_AddEventBottomSheet> {
                 ),
                 initialValue: _selectedCategoryId,
                 isExpanded: true,
+                dropdownColor: theme.colorScheme.surfaceContainerHigh,
                 decoration: InputDecoration(
                   labelText: l10n.categoryName,
                   border: const OutlineInputBorder(),
@@ -1413,6 +1415,7 @@ class _AddEventBottomSheetState extends State<_AddEventBottomSheet> {
                 key: const ValueKey('event-recurrence-dropdown'),
                 initialValue: _recurrenceFrequency,
                 isExpanded: true,
+                dropdownColor: theme.colorScheme.surfaceContainerHigh,
                 decoration: InputDecoration(
                   labelText: l10n.recurrence,
                   border: const OutlineInputBorder(),
@@ -1480,6 +1483,7 @@ class _AddEventBottomSheetState extends State<_AddEventBottomSheet> {
               key: const ValueKey('event-reminder-dropdown'),
               initialValue: _reminderMinutesBefore,
               isExpanded: true,
+              dropdownColor: theme.colorScheme.surfaceContainerHigh,
               decoration: InputDecoration(
                 labelText: l10n.eventReminder,
                 border: const OutlineInputBorder(),

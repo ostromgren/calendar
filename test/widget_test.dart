@@ -73,6 +73,71 @@ void main() {
     expect(tester.widget<FilledButton>(saveButton).onPressed, isNotNull);
   });
 
+  testWidgets('event dropdown menus use the themed surface color', (
+    tester,
+  ) async {
+    final (viewModel, themeViewModel, settings) = await buildViewModels();
+
+    await tester.pumpWidget(
+      createCalendarTestApp(
+        settingsRepository: settings,
+        calendarViewModel: viewModel,
+        themeViewModel: themeViewModel,
+      ),
+    );
+    await tester.pumpAndSettle();
+    final surfaceContainer = Theme.of(
+      tester.element(find.byType(Scaffold).first),
+    ).colorScheme.surfaceContainerHigh;
+
+    await tester.tap(find.text('New Event'));
+    await tester.pumpAndSettle();
+
+    final calendarDropdown = find.byKey(
+      const ValueKey('event-calendar-dropdown'),
+    );
+    final recurrenceDropdown = find.byKey(
+      const ValueKey('event-recurrence-dropdown'),
+    );
+    final reminderDropdown = find.byKey(
+      const ValueKey('event-reminder-dropdown'),
+    );
+
+    expect(
+      tester
+          .widget<DropdownButton<String>>(
+            find.descendant(
+              of: calendarDropdown,
+              matching: find.byType(DropdownButton<String>),
+            ),
+          )
+          .dropdownColor,
+      surfaceContainer,
+    );
+    expect(
+      tester
+          .widget<DropdownButton<RecurrenceFrequency?>>(
+            find.descendant(
+              of: recurrenceDropdown,
+              matching: find.byType(DropdownButton<RecurrenceFrequency?>),
+            ),
+          )
+          .dropdownColor,
+      surfaceContainer,
+    );
+    expect(
+      tester
+          .widget<DropdownButton<int?>>(
+            find.descendant(
+              of: reminderDropdown,
+              matching: find.byType(DropdownButton<int?>),
+            ),
+          )
+          .dropdownColor,
+      surfaceContainer,
+    );
+  });
+
   testWidgets('changing the start time keeps the default one-hour duration', (
     tester,
   ) async {
