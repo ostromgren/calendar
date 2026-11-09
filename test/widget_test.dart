@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart' show MethodChannel;
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/intl.dart';
@@ -28,6 +29,19 @@ Future<void> scrollUntilHitTestable(WidgetTester tester, Finder target) async {
 }
 
 void main() {
+  const widgetChannel = MethodChannel('calendar/widget');
+
+  setUp(() {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(widgetChannel, (call) async => null);
+  });
+
+  tearDown(() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(widgetChannel, null);
+  });
+
   Future<(CalendarViewModel, ThemeViewModel, SettingsRepository)>
   buildViewModels() async {
     SharedPreferences.setMockInitialValues({});

@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart' show MethodChannel;
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -148,6 +149,18 @@ class _FakeDeviceCalendarRepository implements DeviceCalendarRepository {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  const widgetChannel = MethodChannel('calendar/widget');
+
+  setUp(() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(widgetChannel, (call) async => null);
+  });
+
+  tearDown(() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(widgetChannel, null);
+  });
 
   Future<(CalendarViewModel, ThemeViewModel, DeviceCalendarsViewModel)>
   createViewModels(_FakeDeviceCalendarRepository repository) async {

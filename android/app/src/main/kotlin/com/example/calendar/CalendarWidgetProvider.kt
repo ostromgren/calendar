@@ -18,7 +18,15 @@ import android.widget.RemoteViews
 import androidx.core.content.ContextCompat
 import org.json.JSONArray
 import org.json.JSONException
+import org.json.JSONObject
 import java.text.SimpleDateFormat
+import java.time.Instant
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.OffsetDateTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.format.DateTimeParseException
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
@@ -219,11 +227,16 @@ class CalendarWidgetProvider : AppWidgetProvider() {
         }
 
         private fun readUpcomingEvents(context: Context, now: Long): CalendarData {
+            val end = Calendar.getInstance().apply {
+                timeInMillis = now
+                add(Calendar.DAY_OF_YEAR, EVENT_DATE_WINDOW_DAYS)
+            }.timeInMillis
+            val events = readLocalEvents(context, now, end).toMutableList()
             if (
                 ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CALENDAR) !=
                 PackageManager.PERMISSION_GRANTED
             ) {
-                return CalendarData(permissionDenied = true)
+                return calendarData(events, permissionDenied = events.isEmpty())
             }
 
             val preferences = context
@@ -231,13 +244,9 @@ class CalendarWidgetProvider : AppWidgetProvider() {
             val selectedCalendars = readSelectedCalendars(preferences.all)
             if (selectedCalendars is CalendarSelection.Invalid) {
                 Log.e("CalendarWidget", "Unable to read selected calendar IDs.")
-                return CalendarData(failedToLoad = true)
+                return calendarData(events, failedToLoad = events.isEmpty())
             }
             val start = now - TimeUnit.DAYS.toMillis(1)
-            val end = Calendar.getInstance().apply {
-                timeInMillis = now
-                add(Calendar.DAY_OF_YEAR, EVENT_DATE_WINDOW_DAYS)
-            }.timeInMillis
             val instancesUri: Uri = CalendarContract.Instances.CONTENT_URI.buildUpon()
                 .appendPath(start.toString())
                 .appendPath(end.toString())
@@ -249,10 +258,6 @@ class CalendarWidgetProvider : AppWidgetProvider() {
                 CalendarContract.Instances.CALENDAR_ID,
             )
             val selectedIds = (selectedCalendars as? CalendarSelection.Selected)?.ids
-            val events = mutableListOf<WidgetEvent>()
-            var firstDayYear: Int? = null
-            var firstDayOfYear: Int? = null
-            var firstDayEventCount = 0
             val cursor: Cursor? = try {
                 context.contentResolver.query(
                     instancesUri,
@@ -263,11 +268,11 @@ class CalendarWidgetProvider : AppWidgetProvider() {
                 )
             } catch (error: SecurityException) {
                 Log.e("CalendarWidget", "Calendar permission was revoked while loading events.", error)
-                return CalendarData(permissionDenied = true)
+                return calendarData(events, permissionDenied = events.isEmpty())
             }
             if (cursor == null) {
                 Log.e("CalendarWidget", "Calendar provider returned no event cursor.")
-                return CalendarData(failedToLoad = true)
+                return calendarData(events, failedToLoad = events.isEmpty())
             }
             cursor.use {
                 val titleColumn = it.getColumnIndexOrThrow(CalendarContract.Instances.TITLE)
@@ -279,31 +284,207 @@ class CalendarWidgetProvider : AppWidgetProvider() {
                     if (selectedIds != null && calendarId !in selectedIds) continue
                     val begin = it.getLong(beginColumn)
                     if (begin >= end) continue
-                    val eventDay = Calendar.getInstance().apply { timeInMillis = begin }
-                    if (firstDayYear == null) {
-                        firstDayYear = eventDay.get(Calendar.YEAR)
-                        firstDayOfYear = eventDay.get(Calendar.DAY_OF_YEAR)
-                    }
-                    if (
-                        eventDay.get(Calendar.YEAR) == firstDayYear &&
-                        eventDay.get(Calendar.DAY_OF_YEAR) == firstDayOfYear
-                    ) {
-                        firstDayEventCount++
-                    }
-                    if (events.size < 2) {
-                        events += WidgetEvent(
-                            title = it.getString(titleColumn)?.takeIf(String::isNotBlank)
-                                ?: context.getString(R.string.calendar_widget_untitled),
-                            begin = begin,
-                            allDay = it.getInt(allDayColumn) != 0,
-                        )
-                    }
+                    events += WidgetEvent(
+                        title = it.getString(titleColumn)?.takeIf(String::isNotBlank)
+                            ?: context.getString(R.string.calendar_widget_untitled),
+                        begin = begin,
+                        allDay = it.getInt(allDayColumn) != 0,
+                    )
                 }
             }
+            return calendarData(events)
+        }
+
+        private fun calendarData(
+            events: List<WidgetEvent>,
+            permissionDenied: Boolean = false,
+            failedToLoad: Boolean = false,
+        ): CalendarData {
+            val orderedEvents = events.sortedBy(WidgetEvent::begin)
+            val firstDayEventCount = orderedEvents.firstOrNull()?.let { firstEvent ->
+                orderedEvents.count { isSameLocalDay(it.begin, firstEvent.begin) }
+            } ?: 0
             return CalendarData(
-                events = events,
+                events = orderedEvents.take(2),
                 firstDayEventCount = firstDayEventCount,
+                permissionDenied = permissionDenied,
+                failedToLoad = failedToLoad,
             )
+        }
+
+        private fun readLocalEvents(context: Context, now: Long, end: Long): List<WidgetEvent> {
+            val preferences = context
+                .getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
+            val encoded = preferences.getString("flutter.settings.local_events", null)
+                ?: return emptyList()
+            val values = try {
+                JSONArray(encoded)
+            } catch (error: JSONException) {
+                Log.e("CalendarWidget", "Local calendar events are not valid JSON.", error)
+                return emptyList()
+            }
+
+            return buildList {
+                for (index in 0 until values.length()) {
+                    val event = values.optJSONObject(index) ?: continue
+                    addLocalEventOccurrences(context, event, now, end)?.let(::addAll)
+                }
+            }
+        }
+
+        private fun addLocalEventOccurrences(
+            context: Context,
+            event: JSONObject,
+            now: Long,
+            end: Long,
+        ): List<WidgetEvent>? {
+            val start = parseDate(event.optString("startTime"))
+            val eventEnd = parseDate(event.optString("endTime"))
+            if (start == null || eventEnd == null || eventEnd < start) {
+                Log.e("CalendarWidget", "Skipping a local event with invalid dates.")
+                return null
+            }
+            val duration = eventEnd - start
+            val frequency = event.optString("recurrenceFrequency").takeUnless {
+                it.isBlank() || it == "null"
+            }
+            val recurrenceEnd = parseDate(event.optString("recurrenceEndDate"))
+            val excludedDates = event.optJSONArray("excludedOccurrenceDates")
+                ?.let { dates ->
+                    buildSet {
+                        for (index in 0 until dates.length()) {
+                            dates.optString(index).takeIf(String::isNotBlank)?.let(::add)
+                        }
+                    }
+                } ?: emptySet()
+            val lowerBound = maxOf(start, now - duration)
+            var occurrenceIndex = firstOccurrenceIndex(start, frequency, lowerBound)
+            val occurrences = mutableListOf<WidgetEvent>()
+
+            while (true) {
+                val occurrenceStart = occurrenceStart(start, frequency, occurrenceIndex)
+                    ?: break
+                if (occurrenceStart >= end) break
+                if (recurrenceEnd != null && isAfterLocalDay(occurrenceStart, recurrenceEnd)) {
+                    break
+                }
+                val occurrenceEnd = occurrenceStart + duration
+                val dateKey = localDateKey(occurrenceStart)
+                if (
+                    occurrenceEnd > now &&
+                    dateKey !in excludedDates
+                ) {
+                    occurrences += WidgetEvent(
+                        title = event.optString("title").takeIf(String::isNotBlank)
+                            ?: context.getString(R.string.calendar_widget_untitled),
+                        begin = occurrenceStart,
+                        allDay = event.optBoolean("isAllDay", false),
+                    )
+                }
+                if (frequency == null) break
+                occurrenceIndex++
+            }
+            return occurrences
+        }
+
+        private fun firstOccurrenceIndex(start: Long, frequency: String?, lowerBound: Long): Int {
+            if (frequency == null || lowerBound <= start) return 0
+            val startDate = Calendar.getInstance().apply { timeInMillis = start }
+            val lowerDate = Calendar.getInstance().apply { timeInMillis = lowerBound }
+            return when (frequency) {
+                "weekly", "everyTwoWeeks", "everyThreeWeeks" -> {
+                    val intervalWeeks = when (frequency) {
+                        "everyTwoWeeks" -> 2
+                        "everyThreeWeeks" -> 3
+                        else -> 1
+                    }
+                    val startDay = localDate(startDate).toEpochDay()
+                    val lowerDay = localDate(lowerDate).toEpochDay()
+                    ((lowerDay - startDay) / (7L * intervalWeeks) - 1)
+                        .coerceAtLeast(0)
+                        .coerceAtMost(Int.MAX_VALUE.toLong())
+                        .toInt()
+                }
+                "monthly" -> {
+                    val months = (lowerDate.get(Calendar.YEAR) - startDate.get(Calendar.YEAR)) * 12 +
+                        lowerDate.get(Calendar.MONTH) - startDate.get(Calendar.MONTH)
+                    (months - 1).coerceAtLeast(0)
+                }
+                else -> 0
+            }
+        }
+
+        private fun occurrenceStart(start: Long, frequency: String?, index: Int): Long? {
+            if (index == 0) return start
+            val calendar = Calendar.getInstance().apply { timeInMillis = start }
+            when (frequency) {
+                "weekly", "everyTwoWeeks", "everyThreeWeeks" -> {
+                    val intervalWeeks = when (frequency) {
+                        "everyTwoWeeks" -> 2
+                        "everyThreeWeeks" -> 3
+                        else -> 1
+                    }
+                    calendar.add(Calendar.DAY_OF_YEAR, 7 * intervalWeeks * index)
+                }
+                "monthly" -> {
+                    val day = calendar.get(Calendar.DAY_OF_MONTH)
+                    calendar.set(Calendar.DAY_OF_MONTH, 1)
+                    calendar.add(Calendar.MONTH, index)
+                    val lastDay = calendar.getActualMaximum(Calendar.DAY_OF_MONTH)
+                    calendar.set(Calendar.DAY_OF_MONTH, minOf(day, lastDay))
+                }
+                else -> return null
+            }
+            return calendar.timeInMillis
+        }
+
+        private fun parseDate(value: String): Long? {
+            if (value.isBlank() || value == "null") return null
+            try {
+                return Instant.parse(value).toEpochMilli()
+            } catch (_: DateTimeParseException) {
+                // Local DateTime strings from Dart have no timezone suffix.
+            }
+            try {
+                return OffsetDateTime.parse(value, DateTimeFormatter.ISO_DATE_TIME)
+                    .toInstant()
+                    .toEpochMilli()
+            } catch (_: DateTimeParseException) {
+                // Try interpreting timezone-free values in the device timezone.
+            }
+            return try {
+                LocalDateTime.parse(value, DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+                    .atZone(ZoneId.systemDefault())
+                    .toInstant()
+                    .toEpochMilli()
+            } catch (_: DateTimeParseException) {
+                null
+            }
+        }
+
+        private fun localDate(date: Calendar): LocalDate = LocalDate.of(
+            date.get(Calendar.YEAR),
+            date.get(Calendar.MONTH) + 1,
+            date.get(Calendar.DAY_OF_MONTH),
+        )
+
+        private fun localDateKey(time: Long): String {
+            val date = Calendar.getInstance().apply { timeInMillis = time }
+            return String.format(
+                Locale.US,
+                "%04d-%02d-%02d",
+                date.get(Calendar.YEAR),
+                date.get(Calendar.MONTH) + 1,
+                date.get(Calendar.DAY_OF_MONTH),
+            )
+        }
+
+        private fun isAfterLocalDay(first: Long, second: Long): Boolean {
+            val firstDay = Calendar.getInstance().apply { timeInMillis = first }
+            val secondDay = Calendar.getInstance().apply { timeInMillis = second }
+            return firstDay.get(Calendar.YEAR) > secondDay.get(Calendar.YEAR) ||
+                (firstDay.get(Calendar.YEAR) == secondDay.get(Calendar.YEAR) &&
+                    firstDay.get(Calendar.DAY_OF_YEAR) > secondDay.get(Calendar.DAY_OF_YEAR))
         }
 
         private fun isSameLocalDay(first: Long, second: Long): Boolean {

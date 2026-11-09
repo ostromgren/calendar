@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart' show MethodChannel;
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -11,6 +12,18 @@ import 'package:calendar/ui/features/settings/views/local_calendars_view.dart';
 import 'test_app.dart';
 
 void main() {
+  const widgetChannel = MethodChannel('calendar/widget');
+
+  setUp(() {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(widgetChannel, (call) async => null);
+  });
+
+  tearDown(() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(widgetChannel, null);
+  });
   testWidgets(
     'local calendar settings offer ICS import and per-calendar export',
     (tester) async {

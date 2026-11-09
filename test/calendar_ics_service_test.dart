@@ -8,10 +8,12 @@ import 'package:calendar/domain/models/event_category.dart';
 import 'package:calendar/domain/models/recurrence_frequency.dart';
 import 'package:calendar/ui/features/calendar/view_models/calendar_view_model.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:flutter/services.dart' show MethodChannel;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   const service = CalendarIcsService();
 
   test('export and import preserve calendar events and app categories', () {
@@ -129,6 +131,17 @@ void main() {
 
   test('import creates a separate persistent local calendar', () async {
     SharedPreferences.setMockInitialValues({});
+    final widgetMethods = <String>[];
+    const widgetChannel = MethodChannel('calendar/widget');
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(widgetChannel, (call) async {
+          widgetMethods.add(call.method);
+          return null;
+        });
+    addTearDown(() {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(widgetChannel, null);
+    });
     final settings = await SettingsRepository.load();
     final repository = CalendarRepository();
     final viewModel = CalendarViewModel(
@@ -162,5 +175,6 @@ END:VCALENDAR
       (await SettingsRepository.load()).localEvents.single.title,
       'School pickup',
     );
+    expect(widgetMethods, contains('refreshWidget'));
   });
 }

@@ -227,17 +227,21 @@ class SettingsRepository {
     await _syncWidgetEvents(encoded);
   }
 
-  /// Makes locally managed events available to the iOS home-screen widget.
+  /// Makes locally managed events available to the home-screen widget.
   Future<void> syncWidgetEvents() async {
-    if (kIsWeb || defaultTargetPlatform != TargetPlatform.iOS) return;
+    if (kIsWeb) return;
     await _syncWidgetEvents(_prefs.getString(_Keys.localEvents) ?? '[]');
   }
 
   Future<void> _syncWidgetEvents(String encoded) async {
-    if (kIsWeb || defaultTargetPlatform != TargetPlatform.iOS) return;
-    await _widgetChannel.invokeMethod<void>('syncLocalEvents', {
-      'events': encoded,
-    });
+    if (kIsWeb) return;
+    if (defaultTargetPlatform == TargetPlatform.iOS) {
+      await _widgetChannel.invokeMethod<void>('syncLocalEvents', {
+        'events': encoded,
+      });
+    } else if (defaultTargetPlatform == TargetPlatform.android) {
+      await _widgetChannel.invokeMethod<void>('refreshWidget');
+    }
   }
 
   /// Asks the home-screen widget to reload its timeline immediately.
